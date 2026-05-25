@@ -1,0 +1,6 @@
+{
+  "name": "Local PWA Media Player",
+  "description": "A minimalist local MP4 and MKV video player using browser native playback and FFmpeg WASM for remuxing format conversions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
