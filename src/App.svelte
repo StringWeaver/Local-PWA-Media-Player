@@ -27,7 +27,7 @@
 
   let f7params = {
     name: 'Local Player',
-    theme: 'auto',
+    theme: 'md',
   };
 
   function showAlert(msg: string) {
@@ -43,16 +43,25 @@
   }
 
   async function updateStorageEstimate() {
-    if (!navigator.storage || !navigator.storage.estimate) return;
+    if (!navigator.storage || !navigator.storage.estimate) {
+      storageUsed = 'Unknown';
+      return;
+    }
+    
     try {
       const estimate = await navigator.storage.estimate();
       const totalBytes = estimate.usage || 0;
+      if (totalBytes === 0) {
+        storageUsed = 'Unknown';
+        return;
+      }
       const mb = totalBytes / 1024 / 1024;
       let displayStr = mb.toFixed(1) + ' MB';
       if (mb > 1024) displayStr = (mb / 1024).toFixed(2) + ' GB';
       storageUsed = displayStr;
     } catch(e) {
       console.error("Failed to estimate storage", e);
+      storageUsed = 'Unknown';
     }
   }
 
@@ -205,9 +214,8 @@
         inputPath = `${mountDir}/${file.name}`;
         mounted = true;
       } catch (e) {
-        console.warn('WORKERFS mount failed, falling back to MEMFS', e);
-        statusMessage = 'Reading file into memory...';
-        await ffmpeg.writeFile('input_media', await fetchFile(file));
+        console.error('WORKERFS mount failed. Fallback disabled for testing.', e);
+        throw e;
       }
 
       statusMessage = 'Analyzing video stream (HEVC & Subtitles check)...';
@@ -237,23 +245,35 @@
 
       if (subtitleStreams.length > 0) {
          statusMessage = `Extracting ${subtitleStreams.length} subtitle track(s)...`;
+         
+         const extractArgs: string[] = ['-i', inputPath];
+         const outNames: string[] = [];
+
          for (const sub of subtitleStreams) {
-           try {
-             const outName = `sub_${sub.index}.vtt`;
-             const subRet = await ffmpeg.exec(['-i', inputPath, '-map', `0:s:${sub.index}`, outName]);
-             if (subRet === 0) {
-               const subData = await ffmpeg.readFile(outName);
-               const subBlob = new Blob([subData as Uint8Array], { type: 'text/vtt' });
-               extractedTracks.push({
-                 url: URL.createObjectURL(subBlob),
-                 label: `Track ${sub.index + 1} (${sub.language})`,
-                 language: sub.language
-               });
-               await ffmpeg.deleteFile(outName);
-             }
-           } catch(e) {
-             console.error(`Subtitle extraction failed for track ${sub.index}`, e);
-           }
+            const outName = `sub_${sub.index}.vtt`;
+            outNames.push(outName);
+            extractArgs.push('-map', `0:s:${sub.index}`, outName);
+         }
+
+         try {
+            // Execute once to extract all subtitle tracks simultaneously
+            const subRet = await ffmpeg.exec(extractArgs);
+            if (subRet === 0) {
+               for (let i = 0; i < subtitleStreams.length; i++) {
+                  const sub = subtitleStreams[i];
+                  const outName = outNames[i];
+                  const subData = await ffmpeg.readFile(outName);
+                  const subBlob = new Blob([subData as Uint8Array], { type: 'text/vtt' });
+                  extractedTracks.push({
+                     url: URL.createObjectURL(subBlob),
+                     label: `Track ${sub.index + 1} (${sub.language})`,
+                     language: sub.language
+                  });
+                  await ffmpeg.deleteFile(outName);
+               }
+            }
+         } catch(e) {
+            console.error(`Subtitle extraction failed`, e);
          }
       }
 
@@ -288,18 +308,29 @@
            throw new Error("FFmpeg exited with non-zero code.");
         }
 
+        statusMessage = 'Releasing input file memory...';
+        if (mounted) {
+          try { await ffmpeg.unmount(mountDir); } catch(e) {}
+          try { await ffmpeg.deleteDir(mountDir); } catch(e) {}
+        }
+        mounted = false; // Prevent double cleanup later
+
         statusMessage = 'Saving to local cache (clearing RAM)...';
-        const data = await ffmpeg.readFile(outputName);
+        let data: Uint8Array | null = await ffmpeg.readFile(outputName) as Uint8Array;
         
         await ffmpeg.deleteFile('output.mp4');
         const cacheVideoUrl = `/cache-media/${encodeURIComponent(file.name)}/video.mp4`;
 
-        const blob = new Blob([data as Uint8Array], { type: 'video/mp4' });
+        const blob = new Blob([data], { type: 'video/mp4' });
+
         if (window.caches) {
            const cache = await caches.open('local-player-media');
-           await cache.put(cacheVideoUrl, new Response(blob.slice(), { headers: { 'Content-Type': 'video/mp4' } }));
+           await cache.put(cacheVideoUrl, new Response(blob, { headers: { 'Content-Type': 'video/mp4' } })); 
         }
         finalVideoUrl = URL.createObjectURL(blob);
+        
+        // Immediately release the massive JS memory buffer to help GC
+        data = null;
       } else {
         finalVideoUrl = URL.createObjectURL(file);
       }
@@ -318,8 +349,6 @@
       if (mounted) {
         try { await ffmpeg.unmount(mountDir); } catch(e) {}
         try { await ffmpeg.deleteDir(mountDir); } catch(e) {}
-      } else {
-        await ffmpeg.deleteFile('input_media');
       }
 
       videoUrl = finalVideoUrl;
@@ -335,7 +364,7 @@
       
       try {
         const ffmpeg = await getFfmpeg();
-        ['input_media', 'output.mp4'].forEach(async file => {
+        ['output.mp4'].forEach(async file => {
           try { await ffmpeg.deleteFile(file); } catch (e) {}
         });
       } catch (e) {}
@@ -463,7 +492,7 @@
     view = 'home';
     
     getFfmpeg().then(ffmpeg => {
-      ['input_media', 'output.mp4'].forEach(async file => {
+      ['output.mp4'].forEach(async file => {
         try { await ffmpeg.deleteFile(file); } catch (e) {}
       });
     }).catch(() => {});
@@ -500,55 +529,46 @@
         </NavRight>
       </Navbar>
 
-      <div class="page-content bg-white dark:bg-[#121212] flex flex-col items-center justify-center p-4">
-        <div class="w-full flex-1 grid" style="place-items: center; min-height: 100%;">
-          
-          {#if view === 'home'}
-            <div 
-              in:fly={{ x: -100, duration: 300 }} 
-              out:fly={{ x: -100, duration: 300 }} 
-              class="w-full max-w-2xl flex flex-col items-center col-start-1 row-start-1"
-            >
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div class="w-full cursor-pointer shadow-lg card" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
-                <div class="card-content flex flex-col items-center py-16">
-                  <Icon f7="cloud_upload_fill" size="64px" color="blue" />
-                  <h2 class="mt-4 mb-2 text-2xl font-semibold text-center">Drag & drop your video here</h2>
-                  <p class="text-center text-gray-500 mb-6">
-                    Supports MP4, WebM, and MKV files.
-                    MKV files will be locally remuxed to MP4 right in your browser securely.
-                  </p>
-                  <input 
-                    type="file" 
-                    bind:this={fileInputRef} 
-                    onchange={handleInputChange} 
-                    accept="video/*,.mkv" 
-                    class="hidden" 
-                  />
-                  <Button fill round>Browse Files</Button>
-                </div>
+      <div class="page-content bg-white dark:bg-[#121212] p-4 flex flex-col">
+        {#if view === 'home'}
+          <!-- 调整了 justify-start 并添加 pt-12 (顶部 padding) 来整体抬高位置 -->
+          <div class="w-full max-w-2xl mx-auto flex flex-col items-center justify-start pt-12 flex-1 min-h-[calc(100vh-120px)]">
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="w-full cursor-pointer shadow-lg card mb-8" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
+              <div class="card-content flex flex-col items-center py-12 px-4">
+                <Icon f7="cloud_upload_fill" size="64px" color="blue" />
+                <h2 class="mt-4 mb-2 text-2xl font-semibold text-center">Drag & drop your video here</h2>
+                <p class="text-center text-gray-500 mb-6">
+                  Supports MP4, WebM, and MKV files.
+                  MKV files will be locally remuxed to MP4 right in your browser securely.
+                </p>
+                <input 
+                  type="file" 
+                  bind:this={fileInputRef} 
+                  onchange={handleInputChange} 
+                  accept="video/*,.mkv" 
+                  class="hidden" 
+                />
+                <Button fill round>Browse Files</Button>
               </div>
-
-              {#if storageUsed}
-                <div class="mt-8 flex items-center justify-between w-full max-w-sm px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1A1A]">
-                   <div class="flex flex-col">
-                       <span class="text-sm font-medium text-gray-800 dark:text-gray-200">Local Storage Used</span>
-                       <span class="text-xs text-gray-500 dark:text-gray-400">{storageUsed}</span>
-                   </div>
-                   <Button tonal round onClick={promptClearCache}>Clear Cache</Button>
-                </div>
-              {/if}
             </div>
-          {/if}
 
-          {#if view === 'play'}
-            <div 
-              in:fly={{ x: 100, duration: 300 }} 
-              out:fly={{ x: 100, duration: 300 }} 
-              class="w-full flex-1 flex flex-col items-center justify-center col-start-1 row-start-1"
-            >
-              {#if appState === 'CONVERTING'}
+            {#if storageUsed !== ''}
+              <div class="flex items-center justify-between w-full px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1A1A]">
+                 <div class="flex flex-col">
+                     <span class="text-sm font-medium text-gray-800 dark:text-gray-200">Local Storage Used</span>
+                     <span class="text-xs text-gray-500 dark:text-gray-400">{storageUsed}</span>
+                 </div>
+                 <Button tonal round onClick={promptClearCache}>Clear Cache</Button>
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        {#if view === 'play'}
+          <div class="w-full flex-1 flex flex-col items-center justify-center">
+            {#if appState === 'CONVERTING'}
                 <div class="w-full max-w-md p-8 flex flex-col items-center text-center">
                    <div class="mb-8"><Preloader size={64} /></div>
                    <h3 class="text-xl font-semibold mb-2">Processing Video</h3>
@@ -596,12 +616,11 @@
                 </video>
                 <div class="mt-4 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center space-x-2">
                    <Icon f7="info_circle" size="16px" />
-                   <span>Playing locally directly from browser</span>
+                   <span>Playing locally directly from browser.</span>
                 </div>
               {/if}
             </div>
           {/if}
-        </div>
       </div>
     </Page>
   </View>

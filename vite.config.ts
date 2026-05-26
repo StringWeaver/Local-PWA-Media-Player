@@ -63,26 +63,10 @@ export default defineConfig(() => {
           display: 'standalone',
           icons: [
             {
-              src: '/pwa-192x192.svg',
-              sizes: '192x192',
-              type: 'image/svg+xml'
-            },
-            {
-              src: '/pwa-192x192.svg',
-              sizes: '512x512',
-              type: 'image/svg+xml'
-            },
-            {
-              src: '/pwa-192x192.svg',
-              sizes: '192x192',
-              type: 'image/svg+xml',
-              purpose: 'maskable'
-            },
-            {
-              src: '/pwa-192x192.svg',
+              src: '/favicon.svg',
               sizes: '512x512',
               type: 'image/svg+xml',
-              purpose: 'maskable'
+              purpose: 'any maskable'
             }
           ]
         }
@@ -97,10 +81,6 @@ export default defineConfig(() => {
       },
     },
     server: {
-      headers: {
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "require-corp",
-      },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
