@@ -535,7 +535,7 @@
               type="file" 
               bind:this={fileInputRef} 
               onchange={handleInputChange} 
-              accept="video/*,.mkv" 
+              accept="video/*,video/x-matroska,application/x-matroska" 
               class="hidden" 
             />
             <mdui-button style="margin-top: 2rem;">
