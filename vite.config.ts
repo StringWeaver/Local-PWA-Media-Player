@@ -12,7 +12,7 @@ export default defineConfig(() => {
       VitePWA({
         registerType: 'autoUpdate',
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm,json,woff,woff2}'],
           maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
           runtimeCaching: [
             {
@@ -22,6 +22,27 @@ export default defineConfig(() => {
                 cacheName: 'unpkg-cache',
                 expiration: {
                   maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'google-fonts-stylesheets',
+              }
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-webfonts',
+                expiration: {
+                  maxEntries: 30,
                   maxAgeSeconds: 60 * 60 * 24 * 365
                 },
                 cacheableResponse: {
@@ -39,9 +60,14 @@ export default defineConfig(() => {
           display: 'standalone',
           icons: [
             {
-              src: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMiI+PHBhdGggZD0iTTE1IDEwbDQuNTUzLTIuNDI4QTEgMSAwIDAxMjEgOC40NjJ2Ny4wNzZhMSAxIDAgMDEtMS40NDcuODlsLTQuNTUzLTIuNDI4TTE0IDVhMiAyIDAgMDAtMi0ySDZhMiAyIDAgMDAtMiAyMTQiPjwvcGF0aD48L3N2Zz4=',
+              src: '/pwa-192x192.png',
               sizes: '192x192',
-              type: 'image/svg+xml'
+              type: 'image/png'
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png'
             }
           ]
         }
@@ -56,6 +82,10 @@ export default defineConfig(() => {
       },
     },
     server: {
+      headers: {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+      },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

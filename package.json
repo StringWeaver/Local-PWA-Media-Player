@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node copy-ffmpeg.js && vite --port=3000 --host=0.0.0.0",
     "build": "node copy-ffmpeg.js && vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host",
     "clean": "rm -rf dist server.js",
     "lint": "svelte-check && tsc --noEmit",
     "check": "svelte-check"

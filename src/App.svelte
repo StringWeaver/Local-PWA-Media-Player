@@ -39,6 +39,7 @@
   }
 
   async function updateStorageEstimate() {
+    if (!window.caches) return;
     try {
       let totalBytes = 0;
       const cache = await caches.open('local-player-media');
@@ -90,6 +91,10 @@
   });
 
   async function clearCache() {
+    if (!window.caches) {
+       showAlert("Cache API not supported in this environment.");
+       return;
+    }
     try {
       await caches.delete('local-player-media');
       localStorage.removeItem('cached_media_files');
@@ -102,6 +107,7 @@
   }
 
   async function enforceCacheLimit(currentFileName: string) {
+    if (!window.caches) return;
     try {
       const cache = await caches.open('local-player-media');
       const keys = await cache.keys();
@@ -150,33 +156,35 @@
     progress = 0;
 
     try {
-      await enforceCacheLimit(file.name);
-      
-      const cache = await caches.open('local-player-media');
-      const cacheVideoUrl = `/cache-media/${encodeURIComponent(file.name)}/video.mp4`;
-      const cachedVideo = await cache.match(cacheVideoUrl);
-      
-      if (cachedVideo) {
-        statusMessage = 'Loading processed video from local storage...';
-        const diskBlob = await cachedVideo.blob();
-        videoUrl = URL.createObjectURL(diskBlob);
+      if (window.caches) {
+        await enforceCacheLimit(file.name);
         
-        const cachedSubs: { url: string; label: string; language: string }[] = [];
-        let subIdx = 0;
-        while (true) {
-          const subRes = await cache.match(`/cache-media/${encodeURIComponent(file.name)}/sub_${subIdx}.vtt`);
-          if (!subRes) break;
-          const subBlob = await subRes.blob();
-          cachedSubs.push({
-            url: URL.createObjectURL(subBlob),
-            label: `Track ${subIdx + 1}`,
-            language: `sub_${subIdx}`
-          });
-          subIdx++;
+        const cache = await caches.open('local-player-media');
+        const cacheVideoUrl = `/cache-media/${encodeURIComponent(file.name)}/video.mp4`;
+        const cachedVideo = await cache.match(cacheVideoUrl);
+        
+        if (cachedVideo) {
+          statusMessage = 'Loading processed video from local storage...';
+          const diskBlob = await cachedVideo.blob();
+          videoUrl = URL.createObjectURL(diskBlob);
+          
+          const cachedSubs: { url: string; label: string; language: string }[] = [];
+          let subIdx = 0;
+          while (true) {
+            const subRes = await cache.match(`/cache-media/${encodeURIComponent(file.name)}/sub_${subIdx}.vtt`);
+            if (!subRes) break;
+            const subBlob = await subRes.blob();
+            cachedSubs.push({
+              url: URL.createObjectURL(subBlob),
+              label: `Track ${subIdx + 1}`,
+              language: `sub_${subIdx}`
+            });
+            subIdx++;
+          }
+          if (cachedSubs.length > 0) subtitleTracks = cachedSubs;
+          appState = 'PLAYING';
+          return;
         }
-        if (cachedSubs.length > 0) subtitleTracks = cachedSubs;
-        appState = 'PLAYING';
-        return;
       }
       
       statusMessage = 'Loading FFmpeg core...';
@@ -284,22 +292,31 @@
         const data = await ffmpeg.readFile(outputName);
         
         await ffmpeg.deleteFile('output.mp4');
+        const cacheVideoUrl = `/cache-media/${encodeURIComponent(file.name)}/video.mp4`;
 
         const blob = new Blob([data as Uint8Array], { type: 'video/mp4' });
-        await cache.put(cacheVideoUrl, new Response(blob, { headers: { 'Content-Type': 'video/mp4' } }));
-        const diskRes = await cache.match(cacheVideoUrl);
-        const diskBlob = await diskRes?.blob() || blob;
-        finalVideoUrl = URL.createObjectURL(diskBlob);
+        if (window.caches) {
+           const cache = await caches.open('local-player-media');
+           await cache.put(cacheVideoUrl, new Response(blob, { headers: { 'Content-Type': 'video/mp4' } }));
+           const diskRes = await cache.match(cacheVideoUrl);
+           const diskBlob = await diskRes?.blob() || blob;
+           finalVideoUrl = URL.createObjectURL(diskBlob);
+        } else {
+           finalVideoUrl = URL.createObjectURL(blob);
+        }
       } else {
         finalVideoUrl = URL.createObjectURL(file);
       }
       
       statusMessage = 'Finalizing...';
-      for (let i = 0; i < extractedTracks.length; i++) {
-         const track = extractedTracks[i];
-         const trackBlobRes = await fetch(track.url); 
-         const trackBlob = await trackBlobRes.blob();
-         await cache.put(`/cache-media/${encodeURIComponent(file.name)}/sub_${i}.vtt`, new Response(trackBlob, { headers: { 'Content-Type': 'text/vtt' } }));
+      if (window.caches) {
+         const cache = await caches.open('local-player-media');
+         for (let i = 0; i < extractedTracks.length; i++) {
+            const track = extractedTracks[i];
+            const trackBlobRes = await fetch(track.url); 
+            const trackBlob = await trackBlobRes.blob();
+            await cache.put(`/cache-media/${encodeURIComponent(file.name)}/sub_${i}.vtt`, new Response(trackBlob, { headers: { 'Content-Type': 'text/vtt' } }));
+         }
       }
       
       if (mounted) {
@@ -443,9 +460,9 @@
   }
 </script>
 
-<mdui-layout style="height: 100vh;" class="font-sans overflow-hidden bg-white dark:bg-[#121212]">
+<mdui-layout style="height: 100dvh; position: fixed; top: 0; left: 0; right: 0; bottom: 0; overscroll-behavior-y: none;" class="font-sans overflow-hidden bg-white dark:bg-[#121212]">
   
-  <mdui-top-app-bar variant="center-aligned" style="align-items: center; z-index: 10;" class="border-b border-black/5 dark:border-white/5 bg-white dark:bg-[#1A1A1A]">
+  <mdui-top-app-bar variant="center-aligned" style="align-items: center; z-index: 10; position: sticky; top: 0;" class="border-b border-black/5 dark:border-white/5 bg-white dark:bg-[#1A1A1A]">
     {#if view === 'play' && appState === 'PLAYING'}
       <mdui-button-icon icon="arrow_back" onclick={goBack} style="margin: auto 0;"></mdui-button-icon>
     {:else}
@@ -468,7 +485,7 @@
     {/if}
   </mdui-top-app-bar>
 
-  <mdui-layout-main class="w-full mx-auto p-4 flex flex-col items-center justify-center relative overflow-y-auto overflow-x-hidden" style="height: 100%;">
+  <mdui-layout-main class="w-full mx-auto p-4 flex flex-col items-center justify-center relative overflow-y-auto overflow-x-hidden" style="height: calc(100dvh - 64px); -webkit-overflow-scrolling: touch;">
     <div class="w-full flex-1 grid" style="place-items: center;">
       
       {#if view === 'home'}
@@ -558,7 +575,9 @@
               bind:this={videoRef}
               src={videoUrl}
               controls
-              class="w-[80vw] h-[80vh] object-contain bg-black rounded-lg shadow-xl"
+              playsinline
+              class="max-w-[80vw] max-h-[80vh] bg-black rounded-lg shadow-xl"
+              style="width: fit-content; height: auto;"
             >
                {#each subtitleTracks as track, idx}
                  <track
