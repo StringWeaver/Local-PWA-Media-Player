@@ -43,18 +43,10 @@
   }
 
   async function updateStorageEstimate() {
-    if (!window.caches) return;
+    if (!navigator.storage || !navigator.storage.estimate) return;
     try {
-      let totalBytes = 0;
-      const cache = await caches.open('local-player-media');
-      const keys = await cache.keys();
-      for (const req of keys) {
-        const res = await cache.match(req);
-        if (res) {
-          const blob = await res.blob();
-          totalBytes += blob.size;
-        }
-      }
+      const estimate = await navigator.storage.estimate();
+      const totalBytes = estimate.usage || 0;
       const mb = totalBytes / 1024 / 1024;
       let displayStr = mb.toFixed(1) + ' MB';
       if (mb > 1024) displayStr = (mb / 1024).toFixed(2) + ' GB';
@@ -494,7 +486,13 @@
               {#if isProcessingSubtitle}
                 <Preloader size={24} />
               {:else}
-                <input type="file" accept=".srt,.ass" bind:this={subtitleInputRef} onchange={handleSubtitleChange} class="hidden" />
+                <input 
+                  type="file" 
+                  accept=".srt,.ass" 
+                  bind:this={subtitleInputRef} 
+                  onchange={handleSubtitleChange} 
+                  class="hidden" 
+                />
                 <Link iconF7="captions_bubble" onClick={() => subtitleInputRef?.click()} />
               {/if}
             </div>
