@@ -33,14 +33,17 @@ export default defineConfig(() => {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'StaleWhileRevalidate',
               options: {
-                cacheName: 'google-fonts-stylesheets',
+                cacheName: 'google-fonts-stylesheets-v2',
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
               }
             },
             {
               urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
               handler: 'CacheFirst',
               options: {
-                cacheName: 'google-fonts-webfonts',
+                cacheName: 'google-fonts-webfonts-v2',
                 expiration: {
                   maxEntries: 30,
                   maxAgeSeconds: 60 * 60 * 24 * 365
@@ -60,14 +63,26 @@ export default defineConfig(() => {
           display: 'standalone',
           icons: [
             {
-              src: '/pwa-192x192.png',
+              src: '/pwa-192x192.svg',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/svg+xml'
             },
             {
-              src: '/pwa-512x512.png',
+              src: '/pwa-192x192.svg',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/svg+xml'
+            },
+            {
+              src: '/pwa-192x192.svg',
+              sizes: '192x192',
+              type: 'image/svg+xml',
+              purpose: 'maskable'
+            },
+            {
+              src: '/pwa-192x192.svg',
+              sizes: '512x512',
+              type: 'image/svg+xml',
+              purpose: 'maskable'
             }
           ]
         }
