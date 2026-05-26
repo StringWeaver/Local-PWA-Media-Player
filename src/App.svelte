@@ -13,7 +13,13 @@
   import 'mdui/components/button.js';
   import 'mdui/components/circular-progress.js';
   import 'mdui/components/card.js';
-  import 'mdui/components/icon.js';
+  import '@mdui/icons/arrow-back.js';
+  import '@mdui/icons/menu.js';
+  import '@mdui/icons/more-vert.js';
+  import '@mdui/icons/subtitles.js';
+  import '@mdui/icons/cloud-upload.js';
+  import '@mdui/icons/error-outline.js';
+  import '@mdui/icons/info.js';
 
   type View = 'home' | 'play';
   type AppState = 'IDLE' | 'CONVERTING' | 'PLAYING' | 'ERROR';
@@ -480,9 +486,9 @@
   
   <mdui-top-app-bar variant="center-aligned">
     {#if view === 'play' && appState === 'PLAYING'}
-      <mdui-button-icon icon="arrow_back" onclick={goBack}></mdui-button-icon>
+      <mdui-button-icon onclick={goBack}><mdui-icon-arrow-back></mdui-icon-arrow-back></mdui-button-icon>
     {:else}
-      <mdui-button-icon icon="menu" style="opacity: 0; pointer-events: none;"></mdui-button-icon>
+      <mdui-button-icon style="opacity: 0; pointer-events: none;"><mdui-icon-menu></mdui-icon-menu></mdui-button-icon>
     {/if}
     
     <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
@@ -493,11 +499,11 @@
           <mdui-circular-progress style="width: 24px; height: 24px; margin-right: 8px;"></mdui-circular-progress>
         {:else}
           <input type="file" accept=".srt,.ass" bind:this={subtitleInputRef} onchange={handleSubtitleChange} class="hidden" />
-          <mdui-button-icon icon="subtitles" onclick={() => subtitleInputRef?.click()}></mdui-button-icon>
+          <mdui-button-icon onclick={() => subtitleInputRef?.click()}><mdui-icon-subtitles></mdui-icon-subtitles></mdui-button-icon>
         {/if}
       </div>
     {:else}
-      <mdui-button-icon icon="more_vert" style="opacity: 0; pointer-events: none;"></mdui-button-icon>
+      <mdui-button-icon style="opacity: 0; pointer-events: none;"><mdui-icon-more-vert></mdui-icon-more-vert></mdui-button-icon>
     {/if}
   </mdui-top-app-bar>
 
@@ -519,7 +525,7 @@
             style="width: 100%; padding: 4rem 2rem; display: flex; flex-direction: column; align-items: center; cursor: pointer;"
             variant="elevated"
           >
-            <mdui-icon name="cloud_upload" style="font-size: 4rem; color: var(--mdui-color-primary);"></mdui-icon>
+            <mdui-icon-cloud-upload style="font-size: 4rem; color: var(--mdui-color-primary);"></mdui-icon-cloud-upload>
             <h2 style="margin-top: 1rem; margin-bottom: 0.5rem; text-align: center;">Drag & drop your video here</h2>
             <p style="text-align: center; color: var(--mdui-color-on-surface-variant);">
               Supports MP4, WebM, and MKV files.
@@ -578,7 +584,7 @@
 
           {#if appState === 'ERROR'}
              <div class="text-center p-8">
-                <mdui-icon name="error_outline" style="font-size: 4rem; color: var(--mdui-color-error); margin-bottom: 1rem;"></mdui-icon>
+                <mdui-icon-error-outline style="font-size: 4rem; color: var(--mdui-color-error); margin-bottom: 1rem;"></mdui-icon-error-outline>
                 <h3 class="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">Processing Failed</h3>
                 <p class="text-gray-600 dark:text-gray-300 mb-6 max-w-md">{errorMessage}</p>
                 <mdui-button onclick={goBack} variant="filled">Go Back</mdui-button>
@@ -606,7 +612,7 @@
                {/each}
             </video>
             <div class="mt-4 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center space-x-2">
-               <mdui-icon name="info" style="font-size: 16px;"></mdui-icon>
+               <mdui-icon-info style="font-size: 16px;"></mdui-icon-info>
                <span>Playing locally directly from browser</span>
             </div>
           {/if}
