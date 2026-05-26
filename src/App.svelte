@@ -498,7 +498,7 @@
         {#if isProcessingSubtitle}
           <mdui-circular-progress style="width: 24px; height: 24px; margin-right: 8px;"></mdui-circular-progress>
         {:else}
-          <input type="file" accept="text/srt,text/x-ssa,application/x-subrip,application/x-ass" bind:this={subtitleInputRef} onchange={handleSubtitleChange} class="hidden" />
+          <input type="file" accept=".srt,.ass" bind:this={subtitleInputRef} onchange={handleSubtitleChange} class="hidden" />
           <mdui-button-icon onclick={() => subtitleInputRef?.click()}><mdui-icon-subtitles></mdui-icon-subtitles></mdui-button-icon>
         {/if}
       </div>
@@ -535,7 +535,7 @@
               type="file" 
               bind:this={fileInputRef} 
               onchange={handleInputChange} 
-              accept="video/*,video/x-matroska,application/x-matroska" 
+              accept="video/*,.mkv" 
               class="hidden" 
             />
             <mdui-button style="margin-top: 2rem;">
