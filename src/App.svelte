@@ -2,37 +2,19 @@
   import { fly } from 'svelte/transition';
   import { getFfmpeg } from './lib/ffmpeg';
   import { fetchFile } from '@ffmpeg/util';
+  import { App, View, Page, Navbar, NavLeft, NavTitle, NavRight, Link, Block, Card, CardContent, Button, Icon, Preloader, Progressbar, f7 } from 'framework7-svelte';
 
-  import { snackbar } from 'mdui/functions/snackbar.js';
-  import { confirm } from 'mdui/functions/confirm.js';
-  import 'mdui/components/layout.js';
-  import 'mdui/components/layout-main.js';
-  import 'mdui/components/top-app-bar.js';
-  import 'mdui/components/top-app-bar-title.js';
-  import 'mdui/components/button-icon.js';
-  import 'mdui/components/button.js';
-  import 'mdui/components/circular-progress.js';
-  import 'mdui/components/card.js';
-  import '@mdui/icons/arrow-back.js';
-  import '@mdui/icons/menu.js';
-  import '@mdui/icons/more-vert.js';
-  import '@mdui/icons/subtitles.js';
-  import '@mdui/icons/cloud-upload.js';
-  import '@mdui/icons/error-outline.js';
-  import '@mdui/icons/info.js';
-
-  type View = 'home' | 'play';
+  type ViewState = 'home' | 'play';
   type AppState = 'IDLE' | 'CONVERTING' | 'PLAYING' | 'ERROR';
   type SubtitleTrack = { url: string; label: string; language: string };
 
-  let view: View = $state('home');
+  let view: ViewState = $state('home');
   let appState: AppState = $state('IDLE');
   let videoUrl: string | null = $state(null);
   let subtitleTracks: SubtitleTrack[] = $state([]);
   let errorMessage: string = $state('');
   let progress: number = $state(0);
   let statusMessage: string = $state('');
-  // Removed unused variable currentFile
   let isProcessingSubtitle: boolean = $state(false);
   let storageUsed: string = $state('');
   
@@ -43,8 +25,21 @@
   let playbackTimer: ReturnType<typeof setInterval> | undefined;
   let currentFileNameForProgress = '';
 
+  let f7params = {
+    name: 'Local Player',
+    theme: 'auto',
+  };
+
   function showAlert(msg: string) {
-    snackbar({ message: msg });
+    if (f7) {
+      f7.toast.create({
+        text: msg,
+        closeTimeout: 3000,
+        position: 'bottom',
+      }).open();
+    } else {
+      alert(msg);
+    }
   }
 
   async function updateStorageEstimate() {
@@ -77,20 +72,16 @@
 
   $effect(() => {
     if (appState === 'PLAYING' && videoRef && currentFileNameForProgress) {
-      // 恢复进度
       const savedProgress = localStorage.getItem(`progress_${currentFileNameForProgress}`);
       if (savedProgress && videoRef) {
          videoRef.currentTime = parseFloat(savedProgress);
       }
-
-      // 开始记录进度
       playbackTimer = setInterval(() => {
          if (videoRef) {
              localStorage.setItem(`progress_${currentFileNameForProgress}`, videoRef.currentTime.toString());
          }
       }, 2000);
     }
-
     return () => {
        if (playbackTimer) {
           clearInterval(playbackTimer);
@@ -99,18 +90,14 @@
     };
   });
 
-  async function promptClearCache() {
-    try {
-      await confirm({
-        headline: "Clear Local Cache?",
-        description: `This will delete all saved processed videos and free up ${storageUsed}. You will need to process them again next time.`,
-        confirmText: "Clear Cache",
-        cancelText: "Cancel",
-      });
-      await clearCache();
-    } catch {
-      // canceled
-    }
+  function promptClearCache() {
+    f7.dialog.confirm(
+      `This will delete all saved processed videos and free up ${storageUsed}. You will need to process them again next time.`,
+      "Clear Local Cache?",
+      async () => {
+        await clearCache();
+      }
+    );
   }
 
   async function clearCache() {
@@ -249,7 +236,6 @@
       
       ffmpeg.on('log', logHandler);
       try {
-        // Run a fast probe just to get stream info instead of reading the whole file
         await ffmpeg.exec(['-i', inputPath, '-vframes', '1', '-f', 'null', '-']);
       } catch (e) {}
       ffmpeg.off('log', logHandler);
@@ -319,13 +305,9 @@
         const blob = new Blob([data as Uint8Array], { type: 'video/mp4' });
         if (window.caches) {
            const cache = await caches.open('local-player-media');
-           await cache.put(cacheVideoUrl, new Response(blob, { headers: { 'Content-Type': 'video/mp4' } }));
-           const diskRes = await cache.match(cacheVideoUrl);
-           const diskBlob = await diskRes?.blob() || blob;
-           finalVideoUrl = URL.createObjectURL(diskBlob);
-        } else {
-           finalVideoUrl = URL.createObjectURL(blob);
+           await cache.put(cacheVideoUrl, new Response(blob.slice(), { headers: { 'Content-Type': 'video/mp4' } }));
         }
+        finalVideoUrl = URL.createObjectURL(blob);
       } else {
         finalVideoUrl = URL.createObjectURL(file);
       }
@@ -463,11 +445,25 @@
     }
     currentFileNameForProgress = '';
     
-    if (videoUrl) {
-       URL.revokeObjectURL(videoUrl);
-       videoUrl = null;
+    // Safely detach the video element before revoking URLs
+    if (videoRef) {
+       videoRef.pause();
+       videoRef.removeAttribute('src');
+       videoRef.load();
     }
-    subtitleTracks.forEach(t => URL.revokeObjectURL(t.url));
+    
+    // Defer revoking to allow WebKit media engine to fully detach
+    const urlsToRevoke = [];
+    if (videoUrl) urlsToRevoke.push(videoUrl);
+    subtitleTracks.forEach(t => urlsToRevoke.push(t.url));
+    
+    if (urlsToRevoke.length > 0) {
+       setTimeout(() => {
+          urlsToRevoke.forEach(url => URL.revokeObjectURL(url));
+       }, 100);
+    }
+    
+    videoUrl = null;
     subtitleTracks = [];
 
     appState = 'IDLE';
@@ -482,142 +478,133 @@
   }
 </script>
 
-<mdui-layout style="height: 100dvh; position: fixed; top: 0; left: 0; right: 0; bottom: 0; overscroll-behavior-y: none;" class="font-sans overflow-hidden bg-white dark:bg-[#121212]">
-  
-  <mdui-top-app-bar variant="center-aligned">
-    {#if view === 'play' && appState === 'PLAYING'}
-      <mdui-button-icon onclick={goBack}><mdui-icon-arrow-back></mdui-icon-arrow-back></mdui-button-icon>
-    {:else}
-      <mdui-button-icon style="opacity: 0; pointer-events: none;"><mdui-icon-menu></mdui-icon-menu></mdui-button-icon>
-    {/if}
-    
-    <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
-    
-    {#if view === 'play' && appState === 'PLAYING'}
-      <div class="flex items-center pr-2">
-        {#if isProcessingSubtitle}
-          <mdui-circular-progress style="width: 24px; height: 24px; margin-right: 8px;"></mdui-circular-progress>
-        {:else}
-          <input type="file" accept=".srt,.ass" bind:this={subtitleInputRef} onchange={handleSubtitleChange} class="hidden" />
-          <mdui-button-icon onclick={() => subtitleInputRef?.click()}><mdui-icon-subtitles></mdui-icon-subtitles></mdui-button-icon>
-        {/if}
-      </div>
-    {:else}
-      <mdui-button-icon style="opacity: 0; pointer-events: none;"><mdui-icon-more-vert></mdui-icon-more-vert></mdui-button-icon>
-    {/if}
-  </mdui-top-app-bar>
-
-  <mdui-layout-main class="w-full mx-auto p-4 flex flex-col items-center justify-center relative overflow-y-auto overflow-x-hidden" style="height: 100%; -webkit-overflow-scrolling: touch;">
-    <div class="w-full flex-1 grid" style="place-items: center;">
-      
-      {#if view === 'home'}
-        <div 
-          in:fly={{ x: -100, duration: 300 }} 
-          out:fly={{ x: -100, duration: 300 }} 
-          class="w-full max-w-2xl px-4 flex flex-col items-center col-start-1 row-start-1"
-        >
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <mdui-card
-            ondragover={handleDragOver}
-            ondrop={handleDrop}
-            onclick={() => fileInputRef?.click()}
-            style="width: 100%; padding: 4rem 2rem; display: flex; flex-direction: column; align-items: center; cursor: pointer;"
-            variant="elevated"
-          >
-            <mdui-icon-cloud-upload style="font-size: 4rem; color: var(--mdui-color-primary);"></mdui-icon-cloud-upload>
-            <h2 style="margin-top: 1rem; margin-bottom: 0.5rem; text-align: center;">Drag & drop your video here</h2>
-            <p style="text-align: center; color: var(--mdui-color-on-surface-variant);">
-              Supports MP4, WebM, and MKV files.
-              MKV files will be locally remuxed to MP4 right in your browser securely.
-            </p>
-            <input 
-              type="file" 
-              bind:this={fileInputRef} 
-              onchange={handleInputChange} 
-              accept="video/*,.mkv" 
-              class="hidden" 
-            />
-            <mdui-button style="margin-top: 2rem;">
-              Browse Files
-            </mdui-button>
-          </mdui-card>
-
-          {#if storageUsed}
-            <div class="mt-8 flex items-center justify-between w-full max-w-sm px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1A1A]">
-               <div class="flex flex-col">
-                   <span class="text-sm font-medium text-gray-800 dark:text-gray-200">Local Storage Used</span>
-                   <span class="text-xs text-gray-500 dark:text-gray-400">{storageUsed}</span>
-               </div>
-               <mdui-button variant="tonal" onclick={promptClearCache}>Clear Cache</mdui-button>
+<App {...f7params}>
+  <View main>
+    <Page>
+      <Navbar>
+        <NavLeft>
+          {#if view === 'play' && appState === 'PLAYING'}
+            <Link iconF7="arrow_left" onClick={goBack} />
+          {/if}
+        </NavLeft>
+        <NavTitle>Local Player</NavTitle>
+        <NavRight>
+          {#if view === 'play' && appState === 'PLAYING'}
+            <div class="flex items-center pr-2">
+              {#if isProcessingSubtitle}
+                <Preloader size={24} />
+              {:else}
+                <input type="file" accept=".srt,.ass" bind:this={subtitleInputRef} onchange={handleSubtitleChange} class="hidden" />
+                <Link iconF7="captions_bubble" onClick={() => subtitleInputRef?.click()} />
+              {/if}
             </div>
           {/if}
-        </div>
-      {/if}
+        </NavRight>
+      </Navbar>
 
-      {#if view === 'play'}
-        <div 
-          in:fly={{ x: 100, duration: 300 }} 
-          out:fly={{ x: 100, duration: 300 }} 
-          class="w-full flex-1 flex flex-col items-center justify-center col-start-1 row-start-1"
-        >
-          {#if appState === 'CONVERTING'}
-            <div class="w-full max-w-md p-8 flex flex-col items-center text-center">
-               <mdui-circular-progress style="margin-bottom: 2rem; width: 64px; height: 64px;"></mdui-circular-progress>
-               <h3 class="text-xl font-semibold mb-2">Processing Video</h3>
-               <p class="text-gray-500 dark:text-gray-400 mb-6 min-h-[48px]">{statusMessage}</p>
-               
-               <div class="w-full relative pt-1">
-                 <div class="flex mb-2 items-center justify-between">
-                   <div>
-                     <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                       {progress}%
-                     </span>
-                   </div>
-                 </div>
-                 <div class="overflow-hidden h-2 mb-4 text-xs flex rounded-full bg-gray-100 dark:bg-gray-800">
-                   <div style="width: {progress}%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500 transition-all duration-300"></div>
-                 </div>
-               </div>
-            </div>
-          {/if}
-
-          {#if appState === 'ERROR'}
-             <div class="text-center p-8">
-                <mdui-icon-error-outline style="font-size: 4rem; color: var(--mdui-color-error); margin-bottom: 1rem;"></mdui-icon-error-outline>
-                <h3 class="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">Processing Failed</h3>
-                <p class="text-gray-600 dark:text-gray-300 mb-6 max-w-md">{errorMessage}</p>
-                <mdui-button onclick={goBack} variant="filled">Go Back</mdui-button>
-             </div>
-          {/if}
-
-          {#if appState === 'PLAYING'}
-            <!-- svelte-ignore a11y_media_has_caption -->
-            <video
-              bind:this={videoRef}
-              src={videoUrl}
-              controls
-              playsinline
-              class="max-w-[80vw] max-h-[80vh] bg-black rounded-lg shadow-xl"
-              style="width: fit-content; height: auto;"
+      <div class="page-content bg-white dark:bg-[#121212] flex flex-col items-center justify-center p-4">
+        <div class="w-full flex-1 grid" style="place-items: center; min-height: 100%;">
+          
+          {#if view === 'home'}
+            <div 
+              in:fly={{ x: -100, duration: 300 }} 
+              out:fly={{ x: -100, duration: 300 }} 
+              class="w-full max-w-2xl flex flex-col items-center col-start-1 row-start-1"
             >
-               {#each subtitleTracks as track, idx}
-                 <track
-                   kind="subtitles"
-                   src={track.url}
-                   srcLang={track.language}
-                   label={track.label}
-                   default={idx === 0}
-                 />
-               {/each}
-            </video>
-            <div class="mt-4 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center space-x-2">
-               <mdui-icon-info style="font-size: 16px;"></mdui-icon-info>
-               <span>Playing locally directly from browser</span>
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div class="w-full cursor-pointer shadow-lg card" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
+                <div class="card-content flex flex-col items-center py-16">
+                  <Icon f7="cloud_upload_fill" size="64px" color="blue" />
+                  <h2 class="mt-4 mb-2 text-2xl font-semibold text-center">Drag & drop your video here</h2>
+                  <p class="text-center text-gray-500 mb-6">
+                    Supports MP4, WebM, and MKV files.
+                    MKV files will be locally remuxed to MP4 right in your browser securely.
+                  </p>
+                  <input 
+                    type="file" 
+                    bind:this={fileInputRef} 
+                    onchange={handleInputChange} 
+                    accept="video/*,.mkv" 
+                    class="hidden" 
+                  />
+                  <Button fill round>Browse Files</Button>
+                </div>
+              </div>
+
+              {#if storageUsed}
+                <div class="mt-8 flex items-center justify-between w-full max-w-sm px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1A1A]">
+                   <div class="flex flex-col">
+                       <span class="text-sm font-medium text-gray-800 dark:text-gray-200">Local Storage Used</span>
+                       <span class="text-xs text-gray-500 dark:text-gray-400">{storageUsed}</span>
+                   </div>
+                   <Button tonal round onClick={promptClearCache}>Clear Cache</Button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          {#if view === 'play'}
+            <div 
+              in:fly={{ x: 100, duration: 300 }} 
+              out:fly={{ x: 100, duration: 300 }} 
+              class="w-full flex-1 flex flex-col items-center justify-center col-start-1 row-start-1"
+            >
+              {#if appState === 'CONVERTING'}
+                <div class="w-full max-w-md p-8 flex flex-col items-center text-center">
+                   <div class="mb-8"><Preloader size={64} /></div>
+                   <h3 class="text-xl font-semibold mb-2">Processing Video</h3>
+                   <p class="text-gray-500 dark:text-gray-400 mb-6 min-h-[48px]">{statusMessage}</p>
+                   
+                   <div class="w-full">
+                     <div class="flex mb-2 items-center justify-between">
+                       <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                         {progress}%
+                       </span>
+                     </div>
+                     <Progressbar progress={progress} />
+                   </div>
+                </div>
+              {/if}
+
+              {#if appState === 'ERROR'}
+                 <div class="text-center p-8">
+                    <div class="mb-4"><Icon f7="exclamationmark_triangle" size="64px" color="red" /></div>
+                    <h3 class="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">Processing Failed</h3>
+                    <p class="text-gray-600 dark:text-gray-300 mb-6 max-w-md">{errorMessage}</p>
+                    <Button fill round onClick={goBack}>Go Back</Button>
+                 </div>
+              {/if}
+
+              {#if appState === 'PLAYING'}
+                <!-- svelte-ignore a11y_media_has_caption -->
+                <video
+                  bind:this={videoRef}
+                  src={videoUrl}
+                  controls
+                  playsinline
+                  class="max-w-[90vw] max-h-[80vh] bg-black rounded-lg shadow-xl"
+                  style="width: fit-content; height: auto;"
+                >
+                   {#each subtitleTracks as track, idx}
+                     <track
+                       kind="subtitles"
+                       src={track.url}
+                       srcLang={track.language}
+                       label={track.label}
+                       default={idx === 0}
+                     />
+                   {/each}
+                </video>
+                <div class="mt-4 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center space-x-2">
+                   <Icon f7="info_circle" size="16px" />
+                   <span>Playing locally directly from browser</span>
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
-      {/if}
-    </div>
-  </mdui-layout-main>
-</mdui-layout>
+      </div>
+    </Page>
+  </View>
+</App>
