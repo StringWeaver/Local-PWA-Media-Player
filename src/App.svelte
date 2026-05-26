@@ -3,6 +3,18 @@
   import { getFfmpeg } from './lib/ffmpeg';
   import { fetchFile } from '@ffmpeg/util';
 
+  import { snackbar } from 'mdui/functions/snackbar.js';
+  import { confirm } from 'mdui/functions/confirm.js';
+  import 'mdui/components/layout.js';
+  import 'mdui/components/layout-main.js';
+  import 'mdui/components/top-app-bar.js';
+  import 'mdui/components/top-app-bar-title.js';
+  import 'mdui/components/button-icon.js';
+  import 'mdui/components/button.js';
+  import 'mdui/components/circular-progress.js';
+  import 'mdui/components/card.js';
+  import 'mdui/components/icon.js';
+
   type View = 'home' | 'play';
   type AppState = 'IDLE' | 'CONVERTING' | 'PLAYING' | 'ERROR';
   type SubtitleTrack = { url: string; label: string; language: string };
@@ -17,9 +29,7 @@
   // Removed unused variable currentFile
   let isProcessingSubtitle: boolean = $state(false);
   let storageUsed: string = $state('');
-  let snackbarMessage: string = $state('');
-  let isConfirmClearCacheOpen: boolean = $state(false);
-
+  
   let fileInputRef: HTMLInputElement | undefined = $state();
   let subtitleInputRef: HTMLInputElement | undefined = $state();
   let videoRef: HTMLVideoElement | undefined = $state();
@@ -28,14 +38,7 @@
   let currentFileNameForProgress = '';
 
   function showAlert(msg: string) {
-    snackbarMessage = msg;
-    // We would ideally show a snackbar here, but mdui's snackbar usage requires a component.
-    // We can just rely on the mdui-snackbar element binding or API if available.
-    // For now, we will add an mdui-snackbar to the template and open it.
-    const snackbar = document.getElementById('app-snackbar') as any;
-    if (snackbar) {
-      snackbar.open = true;
-    }
+    snackbar({ message: msg });
   }
 
   async function updateStorageEstimate() {
@@ -90,6 +93,20 @@
     };
   });
 
+  async function promptClearCache() {
+    try {
+      await confirm({
+        headline: "Clear Local Cache?",
+        description: `This will delete all saved processed videos and free up ${storageUsed}. You will need to process them again next time.`,
+        confirmText: "Clear Cache",
+        cancelText: "Cancel",
+      });
+      await clearCache();
+    } catch {
+      // canceled
+    }
+  }
+
   async function clearCache() {
     if (!window.caches) {
        showAlert("Cache API not supported in this environment.");
@@ -103,7 +120,6 @@
     } catch(e) {
       showAlert("Failed to clear cache.");
     }
-    isConfirmClearCacheOpen = false;
   }
 
   async function enforceCacheLimit(currentFileName: string) {
@@ -462,17 +478,17 @@
 
 <mdui-layout style="height: 100dvh; position: fixed; top: 0; left: 0; right: 0; bottom: 0; overscroll-behavior-y: none;" class="font-sans overflow-hidden bg-white dark:bg-[#121212]">
   
-  <mdui-top-app-bar variant="center-aligned" style="align-items: center; z-index: 10; position: sticky; top: 0;" class="border-b border-black/5 dark:border-white/5 bg-white dark:bg-[#1A1A1A]">
+  <mdui-top-app-bar variant="center-aligned">
     {#if view === 'play' && appState === 'PLAYING'}
-      <mdui-button-icon icon="arrow_back" onclick={goBack} style="margin: auto 0;"></mdui-button-icon>
+      <mdui-button-icon icon="arrow_back" onclick={goBack}></mdui-button-icon>
     {:else}
-      <mdui-button-icon icon="menu" style="opacity: 0; pointer-events: none; margin: auto 0;"></mdui-button-icon>
+      <mdui-button-icon icon="menu" style="opacity: 0; pointer-events: none;"></mdui-button-icon>
     {/if}
     
     <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
     
     {#if view === 'play' && appState === 'PLAYING'}
-      <div class="flex items-center pr-2" style="margin: auto 0;">
+      <div class="flex items-center pr-2">
         {#if isProcessingSubtitle}
           <mdui-circular-progress style="width: 24px; height: 24px; margin-right: 8px;"></mdui-circular-progress>
         {:else}
@@ -481,11 +497,11 @@
         {/if}
       </div>
     {:else}
-      <mdui-button-icon icon="more_vert" style="opacity: 0; pointer-events: none; margin: auto 0;"></mdui-button-icon>
+      <mdui-button-icon icon="more_vert" style="opacity: 0; pointer-events: none;"></mdui-button-icon>
     {/if}
   </mdui-top-app-bar>
 
-  <mdui-layout-main class="w-full mx-auto p-4 flex flex-col items-center justify-center relative overflow-y-auto overflow-x-hidden" style="height: calc(100dvh - 64px); -webkit-overflow-scrolling: touch;">
+  <mdui-layout-main class="w-full mx-auto p-4 flex flex-col items-center justify-center relative overflow-y-auto overflow-x-hidden" style="height: 100%; -webkit-overflow-scrolling: touch;">
     <div class="w-full flex-1 grid" style="place-items: center;">
       
       {#if view === 'home'}
@@ -527,7 +543,7 @@
                    <span class="text-sm font-medium text-gray-800 dark:text-gray-200">Local Storage Used</span>
                    <span class="text-xs text-gray-500 dark:text-gray-400">{storageUsed}</span>
                </div>
-               <mdui-button variant="tonal" onclick={() => isConfirmClearCacheOpen = true}>Clear Cache</mdui-button>
+               <mdui-button variant="tonal" onclick={promptClearCache}>Clear Cache</mdui-button>
             </div>
           {/if}
         </div>
@@ -598,15 +614,4 @@
       {/if}
     </div>
   </mdui-layout-main>
-
-  <mdui-dialog open={isConfirmClearCacheOpen} onclosed={() => isConfirmClearCacheOpen = false} close-on-overlay-click>
-     <span slot="headline">Clear Local Cache?</span>
-     <div slot="description">
-        This will delete all saved processed videos and free up {storageUsed}. You will need to process them again next time.
-     </div>
-     <mdui-button slot="action" variant="text" onclick={() => isConfirmClearCacheOpen = false}>Cancel</mdui-button>
-     <mdui-button slot="action" variant="filled" onclick={clearCache}>Clear Cache</mdui-button>
-  </mdui-dialog>
-
-  <mdui-snackbar id="app-snackbar">{snackbarMessage}</mdui-snackbar>
 </mdui-layout>

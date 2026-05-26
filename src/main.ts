@@ -2,7 +2,6 @@ import { mount } from 'svelte';
 import App from './App.svelte';
 import './index.css';
 import 'mdui/mdui.css';
-import 'mdui';
 
 // Register PWA service worker
 if ('serviceWorker' in navigator) {
