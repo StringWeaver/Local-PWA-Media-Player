@@ -165,41 +165,8 @@
     }
   }
 
-  async function isDirectory(file: File): Promise<boolean> {
-    if (file.type === '') {
-      try {
-        return await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(false);
-          reader.onerror = () => {
-            if (reader.error && reader.error.name === 'NotReadableError') {
-              resolve(true);
-            } else {
-              resolve(false);
-            }
-          };
-          reader.readAsArrayBuffer(file.slice(0, 1));
-        });
-      } catch (e) {
-        return false;
-      }
-    }
-    return false;
-  }
-
   async function handleFile(file: File) {
     if (!file) return;
-    
-    // macOS directory detection workaround
-    const isDir = await isDirectory(file);
-    if (isDir) {
-      showAlert("Please select a video file, not a directory.");
-      if (fileInputRef) {
-        fileInputRef.value = '';
-      }
-      return;
-    }
-
     const isMkv = file.name.toLowerCase().endsWith('.mkv');
     view = 'play';
     await processFile(file, isMkv);
