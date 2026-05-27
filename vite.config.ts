@@ -11,6 +11,10 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        devOptions: {
+          enabled: true,
+          navigateFallback: 'index.html',
+        },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm,json,woff,woff2}'],
           maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,

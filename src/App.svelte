@@ -179,6 +179,9 @@
     currentFileNameForProgress = file.name;
     appState = 'CONVERTING';
     progress = 0;
+    
+    let mounted = false;
+    const mountDir = `/mnt_${Date.now()}`;
 
     try {
       await enforceCacheLimit(file.name);
@@ -225,8 +228,6 @@
 
       statusMessage = 'Mounting file to virtual file system...';
       let inputPath = 'input_media';
-      let mounted = false;
-      const mountDir = `/mnt_${Date.now()}`;
       
       try {
         await ffmpeg.createDir(mountDir);
@@ -366,7 +367,7 @@
       appState = 'PLAYING';
 
     } catch (err: any) {
-      console.error(err);
+      console.error("Error in processFile:", err);
       errorMessage = err.message || 'An error occurred during video processing.';
       appState = 'ERROR';
       
@@ -415,14 +416,15 @@
     }
     
     isProcessingSubtitle = true;
+    let mounted = false;
+    const mountDir = `/mnt_sub_${Date.now()}`;
+    
     try {
        const ffmpeg = await getFfmpeg();
        const inputName = `ext_${file.name.replace(/\s+/g, '_')}`;
        const outputName = `ext_${Date.now()}.vtt`;
        
-       const mountDir = `/mnt_sub_${Date.now()}`;
        let inputPath = inputName;
-       let mounted = false;
 
        try {
          await ffmpeg.createDir(mountDir);
@@ -453,18 +455,18 @@
        } else {
            showAlert('Failed to process external subtitle.');
        }
-       
-       if (mounted) {
-         try { await ffmpeg.unmount(mountDir); } catch(e) {}
-         try { await ffmpeg.deleteDir(mountDir); } catch(e) {}
-       } else {
-         await ffmpeg.deleteFile(inputName);
-       }
     } catch(err) {
        console.error("External subtitle processing failed", err);
        showAlert('Error processing subtitle file.');
     } finally {
        isProcessingSubtitle = false;
+       if (mounted) {
+         try {
+           const ffmpeg = await getFfmpeg();
+           await ffmpeg.unmount(mountDir);
+           await ffmpeg.deleteDir(mountDir);
+         } catch(e) {}
+       }
     }
   }
 
