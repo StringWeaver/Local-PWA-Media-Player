@@ -74,21 +74,33 @@
   $effect(() => {
     if (appState === 'PLAYING' && videoRef && currentFileNameForProgress) {
       const savedProgress = localStorage.getItem(`progress_${currentFileNameForProgress}`);
-      if (savedProgress && videoRef) {
-         videoRef.currentTime = parseFloat(savedProgress);
-      }
+      
+      const handlePlay = () => {
+        if (savedProgress && videoRef && !videoRef.dataset.progressRestored) {
+          videoRef.currentTime = parseFloat(savedProgress);
+          videoRef.dataset.progressRestored = "true";
+        }
+      };
+      
+      videoRef.addEventListener('play', handlePlay);
+
       playbackTimer = setInterval(() => {
-         if (videoRef) {
+         if (videoRef && !videoRef.paused) {
              localStorage.setItem(`progress_${currentFileNameForProgress}`, videoRef.currentTime.toString());
          }
       }, 2000);
-    }
-    return () => {
-       if (playbackTimer) {
+      
+      return () => {
+        if (videoRef) {
+          videoRef.removeEventListener('play', handlePlay);
+          videoRef.removeAttribute('data-progress-restored');
+        }
+        if (playbackTimer) {
           clearInterval(playbackTimer);
           playbackTimer = undefined;
-       }
-    };
+        }
+      };
+    }
   });
 
   function promptClearCache() {
