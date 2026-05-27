@@ -267,7 +267,6 @@
          }
 
          try {
-            // Execute once to extract all subtitle tracks simultaneously
             const subRet = await ffmpeg.exec(extractArgs);
             if (subRet === 0) {
                for (let i = 0; i < subtitleStreams.length; i++) {
@@ -284,78 +283,67 @@
                }
             }
          } catch(e) {
-            console.error(`Subtitle extraction failed`, e);
+            console.error('Subtitle extraction failed', e);
          }
       }
 
+      statusMessage = 'Releasing FFmpeg memory...';
+      if (mounted) {
+        try { await ffmpeg.unmount(mountDir); } catch(e) {}
+        try { await ffmpeg.deleteDir(mountDir); } catch(e) {}
+      }
+      mounted = false; // Prevent double cleanup later
+
       if (isMkv || isHevc) {
-        if (isMkv) {
-          statusMessage = 'Remuxing MKV to MP4 format...';
-        } else {
-          statusMessage = 'Tagging HEVC stream to hvc1 for Safari compatibility...';
-        }
-        ffmpeg.on('progress', ({ progress: p }) => {
-          progress = Math.max(0, Math.min(100, Math.round(p * 100)));
+        statusMessage = 'Remuxing video to MP4 (zero memory peak)...';
+        
+        const { Conversion, Input, Output, BlobSource, StreamTarget, Mp4OutputFormat, ALL_FORMATS } = await import('mediabunny');
+        const input = new Input({
+          source: new BlobSource(file),
+          formats: ALL_FORMATS,
         });
 
-        const outputName = 'output.mp4';
-        const command = [
-          '-i', inputPath,
-          '-c:v', 'copy',
-          '-c:a', 'copy',
-          '-c:s', 'mov_text',
-          '-map', '0:v?',
-          '-map', '0:a?',
-          '-map', '0:s?',
-          '-metadata', 'encoding_tool=ffmpeg',
-        ];
-        if (isHevc) {
-          command.push('-tag:v', 'hvc1');
-        }
-        command.push(outputName);
+        const opfsRoot = await navigator.storage.getDirectory();
+        const outputFileName = `temp_${Date.now()}.mp4`;
+        const fileHandle = await opfsRoot.getFileHandle(outputFileName, { create: true });
+        const writable = await fileHandle.createWritable();
 
-        const ret = await ffmpeg.exec(command);
-        if (ret !== 0) {
-           throw new Error("FFmpeg exited with non-zero code.");
-        }
+        const output = new Output({
+          format: new Mp4OutputFormat(),
+          target: new StreamTarget(writable),
+        });
 
-        statusMessage = 'Releasing input file memory...';
-        if (mounted) {
-          try { await ffmpeg.unmount(mountDir); } catch(e) {}
-          try { await ffmpeg.deleteDir(mountDir); } catch(e) {}
-        }
-        mounted = false; // Prevent double cleanup later
+        const conversion = await Conversion.init({
+          input,
+          output,
+          video: async (videoTrack) => {
+             // Not setting `codec` forces a stream copy without transcoding
+             const trackConfig: any = {};
+             if (isHevc) {
+                // In MediaBunny, the valid codec identifier is 'hevc'
+                trackConfig.codec = 'hevc';
+             }
+             return trackConfig;
+          },
+          audio: async (audioTrack) => {
+             return {};
+          }
+        });
 
-        statusMessage = 'Saving to local cache (clearing RAM)...';
-        let data: Uint8Array | null = await ffmpeg.readFile(outputName) as Uint8Array;
-        
-        await ffmpeg.deleteFile('output.mp4');
-        const cacheVideoUrl = `/cache-media/${encodeURIComponent(file.name)}/video.mp4`;
+        conversion.onProgress = (p) => {
+          progress = Math.max(0, Math.min(100, Math.round(p * 100)));
+        };
 
-        const blob = new Blob([data], { type: 'video/mp4' });
+        await conversion.execute();
 
-        if (window.caches) {
-           const cache = await caches.open('local-player-media');
-           await cache.put(cacheVideoUrl, new Response(blob, { headers: { 'Content-Type': 'video/mp4' } })); 
-        }
-        finalVideoUrl = URL.createObjectURL(blob);
-        
-        // Immediately release the massive JS memory buffer to help GC
-        data = null;
+        statusMessage = 'Finalizing OPFS file...';
+        const finalFile = await fileHandle.getFile();
+        finalVideoUrl = URL.createObjectURL(finalFile);
       } else {
         finalVideoUrl = URL.createObjectURL(file);
       }
       
       statusMessage = 'Finalizing...';
-      if (window.caches) {
-         const cache = await caches.open('local-player-media');
-         for (let i = 0; i < extractedTracks.length; i++) {
-            const track = extractedTracks[i];
-            const trackBlobRes = await fetch(track.url); 
-            const trackBlob = await trackBlobRes.blob();
-            await cache.put(`/cache-media/${encodeURIComponent(file.name)}/sub_${i}.vtt`, new Response(trackBlob, { headers: { 'Content-Type': 'text/vtt' } }));
-         }
-      }
       
       if (mounted) {
         try { await ffmpeg.unmount(mountDir); } catch(e) {}
