@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { fly } from 'svelte/transition';
+  import { App, Page, Navbar, Block, Card, Button, Link, Preloader, Progressbar, Toast, Dialog, DialogButton } from 'konsta/svelte';
+  import { ArrowLeft, MessageSquareText, CloudUpload, AlertTriangle, Info } from 'lucide-svelte';
   import { getFfmpeg } from './lib/ffmpeg';
-  import { App, View, Page, Navbar, NavLeft, NavTitle, NavRight, Link, Block, Card, CardContent, Button, Icon, Preloader, Progressbar, f7 } from 'framework7-svelte';
 
   type ViewState = 'home' | 'play';
   type AppState = 'IDLE' | 'CONVERTING' | 'PLAYING' | 'ERROR';
@@ -24,21 +24,19 @@
   let playbackTimer: ReturnType<typeof setInterval> | undefined;
   let currentFileNameForProgress = '';
 
-  let f7params = {
-    name: 'Local Player',
-    theme: 'md',
-  };
+  let toastOpened = $state(false);
+  let toastMessage = $state('');
+
+  let dialogOpened = $state(false);
+  let dialogTitle = $state('');
+  let dialogMessage = $state('');
 
   function showAlert(msg: string) {
-    if (f7) {
-      f7.toast.create({
-        text: msg,
-        closeTimeout: 3000,
-        position: 'bottom',
-      }).open();
-    } else {
-      alert(msg);
-    }
+    toastMessage = msg;
+    toastOpened = true;
+    setTimeout(() => {
+      toastOpened = false;
+    }, 3000);
   }
 
   $effect(() => {
@@ -102,16 +100,15 @@
     }
   });
 
-
-
   function promptClearCache() {
-    f7.dialog.confirm(
-      `This will delete all saved processed videos and free up ${storageUsed}. You will need to process them again next time.`,
-      "Clear Local Cache?",
-      async () => {
-        await clearCache();
-      }
-    );
+    dialogTitle = "Clear Local Cache?";
+    dialogMessage = `This will delete all saved processed videos and free up ${storageUsed}. You will need to process them again next time.`;
+    dialogOpened = true;
+  }
+
+  async function confirmClearCache() {
+    dialogOpened = false;
+    await clearCache();
   }
 
   async function clearCache() {
@@ -520,130 +517,142 @@
   }
 </script>
 
-<App {...f7params}>
-  <View main>
-    <Page>
-      <Navbar>
-        <NavLeft>
-          {#if view === 'play' && appState === 'PLAYING'}
-            <Link iconF7="arrow_left" onClick={goBack} />
+<App theme="material">
+  <Page>
+    <Navbar title="Local Player">
+      {#snippet left()}
+        {#if view === 'play' && appState === 'PLAYING'}
+          <Link onclick={goBack}>
+            <ArrowLeft class="w-6 h-6" />
+          </Link>
+        {/if}
+      {/snippet}
+      {#snippet right()}
+        {#if view === 'play' && appState === 'PLAYING'}
+          <div class="flex items-center pr-2">
+            {#if isProcessingSubtitle}
+              <Preloader class="w-6 h-6" />
+            {:else}
+              <input 
+                type="file" 
+                accept=".srt,.ass" 
+                bind:this={subtitleInputRef} 
+                onchange={handleSubtitleChange} 
+                class="hidden" 
+              />
+              <Link onclick={() => subtitleInputRef?.click()}>
+                <MessageSquareText class="w-6 h-6" />
+              </Link>
+            {/if}
+          </div>
+        {/if}
+      {/snippet}
+    </Navbar>
+
+    <div class="flex flex-col flex-1 h-full">
+      {#if view === 'home'}
+        <Block strong inset class="flex flex-col items-center py-12 px-4 mt-8">
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="w-full cursor-pointer flex flex-col items-center" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
+            <CloudUpload class="w-16 h-16 text-primary" />
+            <h2 class="mt-4 mb-2 text-2xl font-semibold text-center">Select or drop video</h2>
+            <p class="text-center text-gray-500 mb-6 text-sm">
+              Supports MP4, WebM, and MKV files.
+              MKV files will be locally remuxed to MP4 right in your browser securely.
+            </p>
+            <input 
+              type="file" 
+              bind:this={fileInputRef} 
+              onchange={handleInputChange} 
+              accept="video/*,.mkv" 
+              class="hidden" 
+            />
+            <Button rounded class="w-auto px-8">Browse Files</Button>
+          </div>
+        </Block>
+
+          {#if storageUsed !== ''}
+            <Block strong inset class="flex items-center justify-between mt-4">
+               <div class="flex flex-col">
+                   <span class="text-sm font-medium">Local Storage Used</span>
+                   <span class="text-xs text-gray-500">{storageUsed}</span>
+               </div>
+               <Button tonal rounded class="w-auto px-4" onclick={promptClearCache}>Clear Cache</Button>
+            </Block>
           {/if}
-        </NavLeft>
-        <NavTitle>Local Player</NavTitle>
-        <NavRight>
-          {#if view === 'play' && appState === 'PLAYING'}
-            <div class="flex items-center pr-2">
-              {#if isProcessingSubtitle}
-                <Preloader size={24} />
-              {:else}
-                <input 
-                  type="file" 
-                  accept=".srt,.ass" 
-                  bind:this={subtitleInputRef} 
-                  onchange={handleSubtitleChange} 
-                  class="hidden" 
-                />
-                <Link iconF7="captions_bubble" onClick={() => subtitleInputRef?.click()} />
-              {/if}
-            </div>
-          {/if}
-        </NavRight>
-      </Navbar>
+      {/if}
 
-      <div class="page-content bg-white dark:bg-[#121212] p-4 flex flex-col">
-        {#if view === 'home'}
-          <!-- 调整了 justify-start 并添加 pt-12 (顶部 padding) 来整体抬高位置 -->
-          <div class="w-full max-w-2xl mx-auto flex flex-col items-center justify-start pt-12 flex-1 min-h-[calc(100vh-120px)]">
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="w-full cursor-pointer shadow-lg card mb-8" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
-              <div class="card-content flex flex-col items-center py-12 px-4">
-                <Icon f7="cloud_upload_fill" size="64px" color="blue" />
-                <h2 class="mt-4 mb-2 text-2xl font-semibold text-center">Drag & drop your video here</h2>
-                <p class="text-center text-gray-500 mb-6">
-                  Supports MP4, WebM, and MKV files.
-                  MKV files will be locally remuxed to MP4 right in your browser securely.
-                </p>
-                <input 
-                  type="file" 
-                  bind:this={fileInputRef} 
-                  onchange={handleInputChange} 
-                  accept="video/*,.mkv" 
-                  class="hidden" 
-                />
-                <Button fill round>Browse Files</Button>
-              </div>
-            </div>
-
-
-            {#if storageUsed !== ''}
-              <div class="flex items-center justify-between w-full px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1A1A]">
-                 <div class="flex flex-col">
-                     <span class="text-sm font-medium text-gray-800 dark:text-gray-200">Local Storage Used</span>
-                     <span class="text-xs text-gray-500 dark:text-gray-400">{storageUsed}</span>
+      {#if view === 'play'}
+        <div class="w-full flex-1 flex flex-col items-center justify-center">
+          {#if appState === 'CONVERTING'}
+              <Block strong inset class="w-full max-w-md p-8 flex flex-col items-center text-center">
+                 <div class="mb-8"><Preloader class="w-16 h-16" /></div>
+                 <h3 class="text-xl font-semibold mb-2">Processing Video</h3>
+                 <p class="text-gray-500 mb-6 min-h-[48px]">{statusMessage}</p>
+                 
+                 <div class="w-full">
+                   <div class="flex mb-2 items-center justify-between">
+                     <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full bg-primary/10 text-primary">
+                       {progress}%
+                     </span>
+                   </div>
+                   <Progressbar progress={progress / 100} />
                  </div>
-                 <Button tonal round onClick={promptClearCache}>Clear Cache</Button>
+              </Block>
+            {/if}
+
+            {#if appState === 'ERROR'}
+               <Block strong inset class="text-center p-8 flex flex-col items-center">
+                  <div class="mb-4"><AlertTriangle class="w-16 h-16 text-red-500" /></div>
+                  <h3 class="text-xl font-semibold mb-2 text-red-500">Processing Failed</h3>
+                  <p class="text-gray-500 mb-6 max-w-md">{errorMessage}</p>
+                  <Button rounded class="w-auto px-8" onclick={goBack}>Go Back</Button>
+               </Block>
+            {/if}
+
+            {#if appState === 'PLAYING'}
+              <!-- svelte-ignore a11y_media_has_caption -->
+              <video
+                bind:this={videoRef}
+                src={videoUrl}
+                controls
+                playsinline
+                class="max-w-[90vw] max-h-[80vh] bg-black shadow-xl"
+                  style="width: fit-content; height: auto;"
+              >
+                 {#each subtitleTracks as track, idx}
+                   <track
+                     kind="subtitles"
+                     src={track.url}
+                     srcLang={track.language}
+                     label={track.label}
+                     default={idx === 0}
+                   />
+                 {/each}
+              </video>
+              <div class="mt-4 text-sm text-gray-500 flex items-center justify-center space-x-2">
+                 <Info class="w-4 h-4" />
+                 <span>Playing locally directly from browser.</span>
               </div>
             {/if}
           </div>
         {/if}
+    </div>
+  </Page>
 
-        {#if view === 'play'}
-          <div class="w-full flex-1 flex flex-col items-center justify-center">
-            {#if appState === 'CONVERTING'}
-                <div class="w-full max-w-md p-8 flex flex-col items-center text-center">
-                   <div class="mb-8"><Preloader size={64} /></div>
-                   <h3 class="text-xl font-semibold mb-2">Processing Video</h3>
-                   <p class="text-gray-500 dark:text-gray-400 mb-6 min-h-[48px]">{statusMessage}</p>
-                   
-                   <div class="w-full">
-                     <div class="flex mb-2 items-center justify-between">
-                       <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                         {progress}%
-                       </span>
-                     </div>
-                     <Progressbar progress={progress} />
-                   </div>
-                </div>
-              {/if}
+  <Toast opened={toastOpened} position="center">
+    <div class="text-sm">{toastMessage}</div>
+  </Toast>
 
-              {#if appState === 'ERROR'}
-                 <div class="text-center p-8">
-                    <div class="mb-4"><Icon f7="exclamationmark_triangle" size="64px" color="red" /></div>
-                    <h3 class="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">Processing Failed</h3>
-                    <p class="text-gray-600 dark:text-gray-300 mb-6 max-w-md">{errorMessage}</p>
-                    <Button fill round onClick={goBack}>Go Back</Button>
-                 </div>
-              {/if}
-
-              {#if appState === 'PLAYING'}
-                <!-- svelte-ignore a11y_media_has_caption -->
-                <video
-                  bind:this={videoRef}
-                  src={videoUrl}
-                  controls
-                  playsinline
-                  class="max-w-[90vw] max-h-[80vh] bg-black rounded-lg shadow-xl"
-                  style="width: fit-content; height: auto;"
-                >
-                   {#each subtitleTracks as track, idx}
-                     <track
-                       kind="subtitles"
-                       src={track.url}
-                       srcLang={track.language}
-                       label={track.label}
-                       default={idx === 0}
-                     />
-                   {/each}
-                </video>
-                <div class="mt-4 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center space-x-2">
-                   <Icon f7="info_circle" size="16px" />
-                   <span>Playing locally directly from browser.</span>
-                </div>
-              {/if}
-            </div>
-          {/if}
-      </div>
-    </Page>
-  </View>
+  <Dialog opened={dialogOpened} onBackdropClick={() => dialogOpened = false}>
+    {#snippet title()}{dialogTitle}{/snippet}
+    <div class="text-sm text-gray-500">
+      {dialogMessage}
+    </div>
+    {#snippet buttons()}
+      <DialogButton onclick={() => dialogOpened = false}>Cancel</DialogButton>
+      <DialogButton strong onclick={confirmClearCache}>OK</DialogButton>
+    {/snippet}
+  </Dialog>
 </App>
