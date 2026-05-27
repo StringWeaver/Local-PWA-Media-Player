@@ -1,7 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
   import { getFfmpeg } from './lib/ffmpeg';
-  import { fetchFile } from '@ffmpeg/util';
   import { App, View, Page, Navbar, NavLeft, NavTitle, NavRight, Link, Block, Card, CardContent, Button, Icon, Preloader, Progressbar, f7 } from 'framework7-svelte';
 
   type ViewState = 'home' | 'play';
@@ -426,7 +425,8 @@
          mounted = true;
        } catch (e) {
          console.warn('WORKERFS failed for subtitle, using MEMFS', e);
-         await ffmpeg.writeFile(inputName, await fetchFile(file));
+         const arrayBuffer = await file.arrayBuffer();
+         await ffmpeg.writeFile(inputName, new Uint8Array(arrayBuffer));
        }
        
        const ret = await ffmpeg.exec(['-i', inputPath, outputName]);
