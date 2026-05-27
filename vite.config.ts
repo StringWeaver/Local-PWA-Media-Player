@@ -74,7 +74,7 @@ export default defineConfig(({ command, mode }) => {
           display: 'standalone',
           icons: [
             {
-              src: '/favicon.svg',
+              src: 'favicon.svg',
               sizes: '512x512',
               type: 'image/svg+xml',
               purpose: 'any maskable'
