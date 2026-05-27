@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node copy-ffmpeg.js && vite --port=3000 --host=0.0.0.0",
-    "build": "node copy-ffmpeg.js && vite build",
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
     "preview": "vite preview --host",
     "clean": "rm -rf dist server.js",
     "lint": "svelte-check && tsc --noEmit",

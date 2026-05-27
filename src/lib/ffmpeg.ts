@@ -1,5 +1,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
+import coreURL from '@ffmpeg/core?url';
+import wasmURL from '@ffmpeg/core/wasm?url';
 
 let ffmpegInstance: FFmpeg | null = null;
 let isLoading = false;
@@ -28,16 +30,10 @@ export const getFfmpeg = async (): Promise<FFmpeg> => {
             console.log("FFmpeg init:", message);
         });
 
-        const baseURL = window.location.origin;
-        console.log("Fetching coreURL from", baseURL + '/ffmpeg-core.js');
-        const coreURL = await toBlobURL(baseURL + '/ffmpeg-core.js', 'text/javascript');
-        console.log("Fetching wasmURL from", baseURL + '/ffmpeg-core.wasm');
-        const wasmURL = await toBlobURL(baseURL + '/ffmpeg-core.wasm', 'application/wasm');
-
         console.log("Loading FFmpeg.load()...");
         await ffmpeg.load({
-            coreURL,
-            wasmURL,
+            coreURL: await toBlobURL(coreURL, 'text/javascript'),
+            wasmURL: await toBlobURL(wasmURL, 'application/wasm'),
         });
         console.log("FFmpeg loaded successfully");
         ffmpegInstance = ffmpeg;
