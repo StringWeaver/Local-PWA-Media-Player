@@ -4,8 +4,15 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+export default defineConfig(({ command, mode }) => {
+  // Use generic base path for GitHub Pages deployment. 
+  // It resolves to '/' for custom domains, or '/<REPO_NAME>/' for standard gh-pages.
+  const base = process.env.GITHUB_REPOSITORY 
+    ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` 
+    : '/';
+
   return {
+    base,
     plugins: [
       svelte(), 
       tailwindcss(),
