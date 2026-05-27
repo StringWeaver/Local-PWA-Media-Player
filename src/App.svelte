@@ -16,7 +16,7 @@
   let statusMessage: string = $state('');
   let isProcessingSubtitle: boolean = $state(false);
   let storageUsed: string = $state('');
-  
+
   let fileInputRef: HTMLInputElement | undefined = $state();
   let subtitleInputRef: HTMLInputElement | undefined = $state();
   let videoRef: HTMLVideoElement | undefined = $state();
@@ -41,6 +41,12 @@
     }
   }
 
+  $effect(() => {
+    if (appState === 'IDLE') {
+      updateStorageEstimate();
+    }
+  });
+
   async function updateStorageEstimate() {
     if (!navigator.storage || !navigator.storage.estimate) {
       storageUsed = 'Unknown';
@@ -63,12 +69,6 @@
       storageUsed = 'Unknown';
     }
   }
-
-  $effect(() => {
-    if (appState === 'IDLE') {
-      updateStorageEstimate();
-    }
-  });
 
   $effect(() => {
     if (appState === 'PLAYING' && videoRef && currentFileNameForProgress) {
@@ -102,6 +102,8 @@
     }
   });
 
+
+
   function promptClearCache() {
     f7.dialog.confirm(
       `This will delete all saved processed videos and free up ${storageUsed}. You will need to process them again next time.`,
@@ -113,12 +115,14 @@
   }
 
   async function clearCache() {
-    if (!window.caches) {
-       showAlert("Cache API not supported in this environment.");
-       return;
-    }
     try {
-      await caches.delete('local-player-media');
+      const opfsRoot = await navigator.storage.getDirectory();
+      // @ts-ignore
+      for await (const name of opfsRoot.keys()) {
+        if (name.startsWith('cache_media_')) {
+          await opfsRoot.removeEntry(name, { recursive: true });
+        }
+      }
       localStorage.removeItem('cached_media_files');
       updateStorageEstimate();
       showAlert("Cache cleared successfully!");
@@ -128,18 +132,19 @@
   }
 
   async function enforceCacheLimit(currentFileName: string) {
-    if (!window.caches) return;
     try {
-      const cache = await caches.open('local-player-media');
-      const keys = await cache.keys();
-      const files = new Set<string>();
-      keys.forEach(req => {
-        const match = req.url.match(/\/cache-media\/([^/]+)\//);
-        if (match) files.add(decodeURIComponent(match[1]));
-      });
-      
+      const opfsRoot = await navigator.storage.getDirectory();
       let storedNames: string[] = JSON.parse(localStorage.getItem('cached_media_files') || '[]');
-      storedNames = storedNames.filter(n => files.has(n));
+      
+      const existingPrefixes = new Set<string>();
+      // @ts-ignore
+      for await (const name of opfsRoot.keys()) {
+        if (name.startsWith('cache_media_')) {
+          existingPrefixes.add(name.replace('cache_media_', ''));
+        }
+      }
+      
+      storedNames = storedNames.filter(n => existingPrefixes.has(encodeURIComponent(n)));
       
       if (!storedNames.includes(currentFileName)) {
         storedNames.push(currentFileName);
@@ -151,11 +156,10 @@
       while (storedNames.length > 2) {
         const toRemove = storedNames.shift();
         if (toRemove) {
-          for (const req of keys) {
-            if (req.url.includes(`/cache-media/${encodeURIComponent(toRemove)}/`)) {
-              await cache.delete(req);
-            }
-          }
+          const dirName = `cache_media_${encodeURIComponent(toRemove)}`;
+          try {
+            await opfsRoot.removeEntry(dirName, { recursive: true });
+          } catch(e) {}
         }
       }
       localStorage.setItem('cached_media_files', JSON.stringify(storedNames));
@@ -177,35 +181,40 @@
     progress = 0;
 
     try {
-      if (window.caches) {
-        await enforceCacheLimit(file.name);
+      await enforceCacheLimit(file.name);
+      
+      const opfsRoot = await navigator.storage.getDirectory();
+      const dirName = `cache_media_${encodeURIComponent(file.name)}`;
+      
+      try {
+        const cacheDir = await opfsRoot.getDirectoryHandle(dirName);
+        const videoHandle = await cacheDir.getFileHandle('video.mp4');
         
-        const cache = await caches.open('local-player-media');
-        const cacheVideoUrl = `/cache-media/${encodeURIComponent(file.name)}/video.mp4`;
-        const cachedVideo = await cache.match(cacheVideoUrl);
+        statusMessage = 'Loading processed video from local storage...';
+        const diskBlob = await videoHandle.getFile();
+        videoUrl = URL.createObjectURL(diskBlob);
         
-        if (cachedVideo) {
-          statusMessage = 'Loading processed video from local storage...';
-          const diskBlob = await cachedVideo.blob();
-          videoUrl = URL.createObjectURL(diskBlob);
-          
-          const cachedSubs: { url: string; label: string; language: string }[] = [];
-          let subIdx = 0;
-          while (true) {
-            const subRes = await cache.match(`/cache-media/${encodeURIComponent(file.name)}/sub_${subIdx}.vtt`);
-            if (!subRes) break;
-            const subBlob = await subRes.blob();
+        const cachedSubs: { url: string; label: string; language: string }[] = [];
+        let subIdx = 0;
+        while (true) {
+          try {
+            const subHandle = await cacheDir.getFileHandle(`sub_${subIdx}.vtt`);
+            const subBlob = await subHandle.getFile();
             cachedSubs.push({
               url: URL.createObjectURL(subBlob),
               label: `Track ${subIdx + 1}`,
               language: `sub_${subIdx}`
             });
             subIdx++;
+          } catch(e) {
+            break;
           }
-          if (cachedSubs.length > 0) subtitleTracks = cachedSubs;
-          appState = 'PLAYING';
-          return;
         }
+        if (cachedSubs.length > 0) subtitleTracks = cachedSubs;
+        appState = 'PLAYING';
+        return;
+      } catch (e) {
+        // Cache miss, continue to process
       }
       
       statusMessage = 'Loading FFmpeg core...';
@@ -225,7 +234,7 @@
         inputPath = `${mountDir}/${file.name}`;
         mounted = true;
       } catch (e) {
-        console.error('WORKERFS mount failed. Fallback disabled for testing.', e);
+        console.error('WORKERFS mount failed. Fallback disabled.', e);
         throw e;
       }
 
@@ -253,6 +262,8 @@
 
       let extractedTracks: SubtitleTrack[] = [];
       let finalVideoUrl: string = '';
+      
+      const cacheDir = await opfsRoot.getDirectoryHandle(dirName, { create: true });
 
       if (subtitleStreams.length > 0) {
          statusMessage = `Extracting ${subtitleStreams.length} subtitle track(s)...`;
@@ -274,6 +285,13 @@
                   const outName = outNames[i];
                   const subData = await ffmpeg.readFile(outName);
                   const subBlob = new Blob([subData as Uint8Array], { type: 'text/vtt' });
+                  
+                  // Save subtitle to OPFS cache
+                  const subHandle = await cacheDir.getFileHandle(`sub_${i}.vtt`, { create: true });
+                  const subWritable = await subHandle.createWritable();
+                  await subWritable.write(subBlob);
+                  await subWritable.close();
+                  
                   extractedTracks.push({
                      url: URL.createObjectURL(subBlob),
                      label: `Track ${sub.index + 1} (${sub.language})`,
@@ -295,7 +313,7 @@
       mounted = false; // Prevent double cleanup later
 
       if (isMkv || isHevc) {
-        statusMessage = 'Remuxing video to MP4 (zero memory peak)...';
+        statusMessage = 'Remuxing video to MP4 ...';
         
         const { Conversion, Input, Output, BlobSource, StreamTarget, Mp4OutputFormat, ALL_FORMATS } = await import('mediabunny');
         const input = new Input({
@@ -303,9 +321,7 @@
           formats: ALL_FORMATS,
         });
 
-        const opfsRoot = await navigator.storage.getDirectory();
-        const outputFileName = `temp_${Date.now()}.mp4`;
-        const fileHandle = await opfsRoot.getFileHandle(outputFileName, { create: true });
+        const fileHandle = await cacheDir.getFileHandle('video.mp4', { create: true });
         const writable = await fileHandle.createWritable();
 
         const output = new Output({
@@ -343,13 +359,6 @@
         finalVideoUrl = URL.createObjectURL(file);
       }
       
-      statusMessage = 'Finalizing...';
-      
-      if (mounted) {
-        try { await ffmpeg.unmount(mountDir); } catch(e) {}
-        try { await ffmpeg.deleteDir(mountDir); } catch(e) {}
-      }
-
       videoUrl = finalVideoUrl;
       if (extractedTracks.length > 0) {
         subtitleTracks = extractedTracks;
@@ -367,6 +376,15 @@
           try { await ffmpeg.deleteFile(file); } catch (e) {}
         });
       } catch (e) {}
+    } finally {
+      // Ensure we always clean up if an error occurred before the early cleanup
+      if (mounted) {
+        try {
+          const ffmpeg = await getFfmpeg();
+          await ffmpeg.unmount(mountDir);
+          await ffmpeg.deleteDir(mountDir);
+        } catch(e) {}
+      }
     }
   }
 
@@ -412,9 +430,10 @@
          inputPath = `${mountDir}/${file.name}`;
          mounted = true;
        } catch (e) {
-         console.warn('WORKERFS failed for subtitle, using MEMFS', e);
-         const arrayBuffer = await file.arrayBuffer();
-         await ffmpeg.writeFile(inputName, new Uint8Array(arrayBuffer));
+         console.error('WORKERFS mount failed. Fallback disabled.', e);
+         throw e;
+        //  const arrayBuffer = await file.arrayBuffer();
+        //  await ffmpeg.writeFile(inputName, new Uint8Array(arrayBuffer));
        }
        
        const ret = await ffmpeg.exec(['-i', inputPath, outputName]);
@@ -553,6 +572,7 @@
                 <Button fill round>Browse Files</Button>
               </div>
             </div>
+
 
             {#if storageUsed !== ''}
               <div class="flex items-center justify-between w-full px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1A1A]">
