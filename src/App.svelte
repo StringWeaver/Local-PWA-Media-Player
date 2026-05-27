@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { App, Page, Navbar, Block, Card, Button, Link, Preloader, Progressbar, Toast, Dialog, DialogButton } from 'konsta/svelte';
+  import { snackbar } from 'mdui/functions/snackbar.js';
   import { ArrowLeft, MessageSquareText, CloudUpload, AlertTriangle, Info } from 'lucide-svelte';
   import { getFfmpeg } from './lib/ffmpeg';
 
@@ -24,19 +24,12 @@
   let playbackTimer: ReturnType<typeof setInterval> | undefined;
   let currentFileNameForProgress = '';
 
-  let toastOpened = $state(false);
-  let toastMessage = $state('');
-
   let dialogOpened = $state(false);
   let dialogTitle = $state('');
   let dialogMessage = $state('');
 
   function showAlert(msg: string) {
-    toastMessage = msg;
-    toastOpened = true;
-    setTimeout(() => {
-      toastOpened = false;
-    }, 3000);
+    snackbar({ message: msg, placement: 'bottom' });
   }
 
   $effect(() => {
@@ -517,41 +510,42 @@
   }
 </script>
 
-<App theme="material">
-  <Page>
-    <Navbar title="Local Player">
-      {#snippet left()}
-        {#if view === 'play' && appState === 'PLAYING'}
-          <Link onclick={goBack}>
-            <ArrowLeft class="w-6 h-6" />
-          </Link>
-        {/if}
-      {/snippet}
-      {#snippet right()}
-        {#if view === 'play' && appState === 'PLAYING'}
-          <div class="flex items-center pr-2">
-            {#if isProcessingSubtitle}
-              <Preloader class="w-6 h-6" />
-            {:else}
-              <input 
-                type="file" 
-                accept=".srt,.ass" 
-                bind:this={subtitleInputRef} 
-                onchange={handleSubtitleChange} 
-                class="hidden" 
-              />
-              <Link onclick={() => subtitleInputRef?.click()}>
-                <MessageSquareText class="w-6 h-6" />
-              </Link>
-            {/if}
-          </div>
-        {/if}
-      {/snippet}
-    </Navbar>
+<mdui-layout>
+  <mdui-top-app-bar>
+    {#if view === 'play' && appState === 'PLAYING'}
+      <mdui-button-icon onclick={goBack}>
+        <ArrowLeft class="w-6 h-6" />
+      </mdui-button-icon>
+    {/if}
 
+    <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
+
+    <div style="flex-grow: 1"></div>
+
+    {#if view === 'play' && appState === 'PLAYING'}
+      <div class="flex items-center pr-2">
+        {#if isProcessingSubtitle}
+          <mdui-circular-progress class="w-6 h-6"></mdui-circular-progress>
+        {:else}
+          <input 
+            type="file" 
+            accept=".srt,.ass" 
+            bind:this={subtitleInputRef} 
+            onchange={handleSubtitleChange} 
+            class="hidden" 
+          />
+          <mdui-button-icon onclick={() => subtitleInputRef?.click()}>
+            <MessageSquareText class="w-6 h-6" />
+          </mdui-button-icon>
+        {/if}
+      </div>
+    {/if}
+  </mdui-top-app-bar>
+
+  <mdui-layout-main class="flex flex-col h-full" style="min-height: calc(100vh - 64px);">
     <div class="flex flex-col flex-1 h-full">
       {#if view === 'home'}
-        <Block strong inset class="flex flex-col items-center py-12 px-4 mt-8">
+        <mdui-card variant="filled" class="flex flex-col items-center py-12 px-4 mx-4 mt-8">
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="w-full cursor-pointer flex flex-col items-center" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
@@ -568,26 +562,26 @@
               accept="video/*,.mkv" 
               class="hidden" 
             />
-            <Button rounded class="w-auto px-8">Browse Files</Button>
+            <mdui-button class="w-auto px-8" style="border-radius: 9999px;">Browse Files</mdui-button>
           </div>
-        </Block>
+        </mdui-card>
 
-          {#if storageUsed !== ''}
-            <Block strong inset class="flex items-center justify-between mt-4">
-               <div class="flex flex-col">
-                   <span class="text-sm font-medium">Local Storage Used</span>
-                   <span class="text-xs text-gray-500">{storageUsed}</span>
-               </div>
-               <Button tonal rounded class="w-auto px-4" onclick={promptClearCache}>Clear Cache</Button>
-            </Block>
-          {/if}
+        {#if storageUsed !== ''}
+          <mdui-card variant="filled" class="flex items-center justify-between p-4 mx-4 mt-4">
+             <div class="flex flex-col">
+                 <span class="text-sm font-medium">Local Storage Used</span>
+                 <span class="text-xs text-gray-500">{storageUsed}</span>
+             </div>
+             <mdui-button variant="tonal" class="w-auto px-4" style="border-radius: 9999px;" onclick={promptClearCache}>Clear Cache</mdui-button>
+          </mdui-card>
+        {/if}
       {/if}
 
       {#if view === 'play'}
         <div class="w-full flex-1 flex flex-col items-center justify-center">
           {#if appState === 'CONVERTING'}
-              <Block strong inset class="w-full max-w-md p-8 flex flex-col items-center text-center">
-                 <div class="mb-8"><Preloader class="w-16 h-16" /></div>
+              <mdui-card variant="filled" class="w-full max-w-md p-8 m-4 flex flex-col items-center text-center">
+                 <div class="mb-8"><mdui-circular-progress class="w-16 h-16"></mdui-circular-progress></div>
                  <h3 class="text-xl font-semibold mb-2">Processing Video</h3>
                  <p class="text-gray-500 mb-6 min-h-[48px]">{statusMessage}</p>
                  
@@ -597,18 +591,18 @@
                        {progress}%
                      </span>
                    </div>
-                   <Progressbar progress={progress / 100} />
+                   <mdui-linear-progress value={progress / 100} max="1"></mdui-linear-progress>
                  </div>
-              </Block>
+              </mdui-card>
             {/if}
 
             {#if appState === 'ERROR'}
-               <Block strong inset class="text-center p-8 flex flex-col items-center">
+               <mdui-card variant="filled" class="text-center p-8 m-4 flex flex-col items-center">
                   <div class="mb-4"><AlertTriangle class="w-16 h-16 text-red-500" /></div>
                   <h3 class="text-xl font-semibold mb-2 text-red-500">Processing Failed</h3>
                   <p class="text-gray-500 mb-6 max-w-md">{errorMessage}</p>
-                  <Button rounded class="w-auto px-8" onclick={goBack}>Go Back</Button>
-               </Block>
+                  <mdui-button class="w-auto px-8" style="border-radius: 9999px;" onclick={goBack}>Go Back</mdui-button>
+               </mdui-card>
             {/if}
 
             {#if appState === 'PLAYING'}
@@ -639,20 +633,14 @@
           </div>
         {/if}
     </div>
-  </Page>
+  </mdui-layout-main>
 
-  <Toast opened={toastOpened} position="center">
-    <div class="text-sm">{toastMessage}</div>
-  </Toast>
-
-  <Dialog opened={dialogOpened} onBackdropClick={() => dialogOpened = false}>
-    {#snippet title()}{dialogTitle}{/snippet}
+  <mdui-dialog open={dialogOpened} onclosed={() => dialogOpened = false} close-on-overlay-click>
+    <span slot="headline">{dialogTitle}</span>
     <div class="text-sm text-gray-500">
       {dialogMessage}
     </div>
-    {#snippet buttons()}
-      <DialogButton onclick={() => dialogOpened = false}>Cancel</DialogButton>
-      <DialogButton strong onclick={confirmClearCache}>OK</DialogButton>
-    {/snippet}
-  </Dialog>
-</App>
+    <mdui-button slot="action" variant="text" onclick={() => dialogOpened = false}>Cancel</mdui-button>
+    <mdui-button slot="action" variant="text" onclick={confirmClearCache}>OK</mdui-button>
+  </mdui-dialog>
+</mdui-layout>

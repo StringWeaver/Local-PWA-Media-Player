@@ -1,4 +1,6 @@
 import { mount } from 'svelte';
+import 'mdui/mdui.css';
+import 'mdui';
 import App from './App.svelte';
 import './index.css';
 
