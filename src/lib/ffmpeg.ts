@@ -1,5 +1,4 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
 import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
 
@@ -32,8 +31,8 @@ export const getFfmpeg = async (): Promise<FFmpeg> => {
 
         console.log("Loading FFmpeg.load()...");
         await ffmpeg.load({
-            coreURL: await toBlobURL(coreURL, 'text/javascript'),
-            wasmURL: await toBlobURL(wasmURL, 'application/wasm'),
+            coreURL,
+            wasmURL,
         });
         console.log("FFmpeg loaded successfully");
         ffmpegInstance = ffmpeg;
