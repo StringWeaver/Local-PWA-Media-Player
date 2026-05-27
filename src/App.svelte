@@ -337,7 +337,7 @@
              // Not setting `codec` forces a stream copy without transcoding
              const trackConfig: any = {};
              if (isHevc) {
-                // In MediaBunny, the valid codec identifier is 'hevc'
+                // Ensure hevc video stream is tagged with hvc1, bucause safari doesn't support hev1
                 trackConfig.codec = 'hevc';
              }
              return trackConfig;
