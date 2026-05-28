@@ -64,15 +64,19 @@
   $effect(() => {
     if (appState === 'PLAYING' && videoRef && currentFileNameForProgress) {
       const savedProgress = localStorage.getItem(`progress_${currentFileNameForProgress}`);
-      
-      const handlePlay = () => {
-        if (savedProgress && videoRef && !videoRef.dataset.progressRestored) {
-          videoRef.currentTime = parseFloat(savedProgress);
-          videoRef.dataset.progressRestored = "true";
+
+      let progressTimer: ReturnType<typeof setTimeout> | undefined;
+      const handleLoadedData = () => {
+        if (savedProgress && videoRef) {
+          progressTimer = setTimeout(() => {
+            if (videoRef) {
+              videoRef.currentTime = parseFloat(savedProgress);
+            }
+          }, 500);
         }
       };
       
-      videoRef.addEventListener('play', handlePlay);
+      videoRef.addEventListener('loadeddata', handleLoadedData);
 
       playbackTimer = setInterval(() => {
          if (videoRef && !videoRef.paused) {
@@ -82,8 +86,11 @@
       
       return () => {
         if (videoRef) {
-          videoRef.removeEventListener('play', handlePlay);
-          videoRef.removeAttribute('data-progress-restored');
+          videoRef.removeEventListener('loadeddata', handleLoadedData);
+        }
+        if (progressTimer) {
+          clearTimeout(progressTimer);
+          progressTimer = undefined;
         }
         if (playbackTimer) {
           clearInterval(playbackTimer);
@@ -347,6 +354,7 @@
         };
 
         await conversion.execute();
+        input.dispose();
 
         statusMessage = 'Finalizing OPFS file...';
         const finalFile = await fileHandle.getFile();
