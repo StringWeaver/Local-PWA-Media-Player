@@ -523,7 +523,7 @@
     <div style="flex-grow: 1"></div>
 
     {#if view === 'play' && appState === 'PLAYING'}
-      <div class="toolbar-actions">
+      <div style="display:flex;align-items:center;padding-right:0.5rem">
         {#if isProcessingSubtitle}
           <mdui-circular-progress class="icon-sm"></mdui-circular-progress>
         {:else}
@@ -543,7 +543,6 @@
   </mdui-top-app-bar>
 
   <mdui-layout-main class="layout-main" style="min-height: calc(100vh - 64px);">
-    <div class="content-wrapper">
       {#if view === 'home'}
         <mdui-card variant="filled" class="upload-card">
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -562,7 +561,7 @@
               accept="video/*,.mkv" 
               class="hidden" 
             />
-            <mdui-button class="btn-pill">Browse Files</mdui-button>
+            <mdui-button class="btn-pill" style="--shape-corner: var(--mdui-shape-corner-full); padding-inline: 2rem;">Browse Files</mdui-button>
           </div>
         </mdui-card>
 
@@ -572,7 +571,7 @@
                  <span class="storage-label">Local Storage Used</span>
                  <span class="storage-value">{storageUsed}</span>
              </div>
-             <mdui-button variant="tonal" class="btn-clear" onclick={promptClearCache}>Clear Cache</mdui-button>
+             <mdui-button variant="tonal" class="btn-clear" style="--shape-corner: var(--mdui-shape-corner-full);" onclick={promptClearCache}>Clear Cache</mdui-button>
           </mdui-card>
         {/if}
       {/if}
@@ -601,7 +600,7 @@
                   <div class="error-icon-wrap"><AlertTriangle class="error-icon" /></div>
                   <h3 class="error-title">Processing Failed</h3>
                   <p class="error-desc">{errorMessage}</p>
-                  <mdui-button class="btn-pill" onclick={goBack}>Go Back</mdui-button>
+                  <mdui-button class="btn-pill" style="--shape-corner: var(--mdui-shape-corner-full); padding-inline: 2rem;" onclick={goBack}>Go Back</mdui-button>
                </mdui-card>
             {/if}
 
@@ -632,14 +631,9 @@
             {/if}
           </div>
         {/if}
-    </div>
   </mdui-layout-main>
 
-  <mdui-dialog open={dialogOpened} onclosed={() => dialogOpened = false} close-on-overlay-click>
-    <span slot="headline">{dialogTitle}</span>
-    <div class="dialog-message">
-      {dialogMessage}
-    </div>
+  <mdui-dialog open={dialogOpened} headline={dialogTitle} description={dialogMessage} onclosed={() => dialogOpened = false} close-on-overlay-click>
     <mdui-button slot="action" variant="text" onclick={() => dialogOpened = false}>Cancel</mdui-button>
     <mdui-button slot="action" variant="text" onclick={confirmClearCache}>OK</mdui-button>
   </mdui-dialog>
@@ -667,24 +661,10 @@
     display: none;
   }
 
-  /* Toolbar */
-  .toolbar-actions {
-    display: flex;
-    align-items: center;
-    padding-right: 0.5rem;
-  }
-
-  /* Layout */
+  /* Layout: mdui-layout-main 自带 flex:1 0 auto，只需加方向 */
   :global(.layout-main) {
     display: flex;
     flex-direction: column;
-    height: 100%;
-  }
-
-  .content-wrapper {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
     height: 100%;
   }
 
@@ -714,8 +694,8 @@
   .upload-title {
     margin-top: 1rem;
     margin-bottom: 0.5rem;
-    font-size: 1.5rem;
-    font-weight: 600;
+    font-size: var(--mdui-typescale-headline-small-size);
+    font-weight: var(--mdui-typescale-title-medium-weight);
     text-align: center;
   }
 
@@ -723,22 +703,16 @@
     text-align: center;
     color: var(--mdui-color-on-surface-variant);
     margin-bottom: 1.5rem;
-    font-size: 0.875rem;
+    font-size: var(--mdui-typescale-body-medium-size);
   }
 
-  /* Pill buttons */
+  /* Pill buttons — mdui-button 默认 shape-corner 已是 full，只调 padding */
   :global(.btn-pill) {
     width: auto;
-    padding-left: 2rem;
-    padding-right: 2rem;
-    border-radius: 9999px;
   }
 
   :global(.btn-clear) {
     width: auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
-    border-radius: 9999px;
   }
 
   /* Storage card */
@@ -756,12 +730,12 @@
   }
 
   .storage-label {
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: var(--mdui-typescale-body-medium-size);
+    font-weight: var(--mdui-typescale-label-large-weight);
   }
 
   .storage-value {
-    font-size: 0.75rem;
+    font-size: var(--mdui-typescale-body-small-size);
     color: var(--mdui-color-on-surface-variant);
   }
 
@@ -775,8 +749,9 @@
     justify-content: center;
   }
 
-  /* Converting card */
-  :global(.converting-card) {
+  /* Shared card layout (converting + error) */
+  :global(.converting-card),
+  :global(.error-card) {
     width: 100%;
     max-width: 28rem;
     padding: 2rem;
@@ -787,22 +762,45 @@
     text-align: center;
   }
 
+  :global(.error-icon) {
+    width: 4rem;
+    height: 4rem;
+    color: var(--mdui-color-error);
+  }
+
+  .progress-icon-wrap,
+  .error-icon-wrap {
+    margin-bottom: 1rem;
+  }
+
   .progress-icon-wrap {
     margin-bottom: 2rem;
   }
 
-  .card-title {
-    font-size: 1.25rem;
-    font-weight: 600;
+  /* Shared title style */
+  .card-title,
+  .error-title {
+    font-size: var(--mdui-typescale-title-large-size);
+    font-weight: var(--mdui-typescale-title-medium-weight);
     margin-bottom: 0.5rem;
   }
 
-  .card-desc {
+  .error-title {
+    color: var(--mdui-color-error);
+  }
+
+  /* Shared description style */
+  .card-desc,
+  .error-desc {
     color: var(--mdui-color-on-surface-variant);
     margin-bottom: 1.5rem;
+  }
+
+  .card-desc {
     min-height: 3rem;
   }
 
+  /* Progress */
   .progress-section {
     width: 100%;
   }
@@ -815,47 +813,14 @@
   }
 
   .progress-badge {
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--mdui-typescale-label-small-size);
+    font-weight: var(--mdui-typescale-label-large-weight);
     display: inline-block;
     padding: 0.25rem 0.5rem;
     text-transform: uppercase;
     border-radius: 9999px;
     background: color-mix(in srgb, var(--mdui-color-primary) 10%, transparent);
     color: var(--mdui-color-primary);
-  }
-
-  /* Error card */
-  :global(.error-card) {
-    text-align: center;
-    padding: 2rem;
-    margin: 1rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .error-icon-wrap {
-    margin-bottom: 1rem;
-  }
-
-  :global(.error-icon) {
-    width: 4rem;
-    height: 4rem;
-    color: var(--mdui-color-error);
-  }
-
-  .error-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    color: var(--mdui-color-error);
-  }
-
-  .error-desc {
-    color: var(--mdui-color-on-surface-variant);
-    margin-bottom: 1.5rem;
-    max-width: 28rem;
   }
 
   /* Video player */
@@ -869,17 +834,11 @@
   /* Play info bar */
   .play-info {
     margin-top: 1rem;
-    font-size: 0.875rem;
+    font-size: var(--mdui-typescale-body-medium-size);
     color: var(--mdui-color-on-surface-variant);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-  }
-
-  /* Dialog */
-  .dialog-message {
-    font-size: 0.875rem;
-    color: var(--mdui-color-on-surface-variant);
   }
 </style>
