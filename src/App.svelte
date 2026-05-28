@@ -247,8 +247,13 @@
       
       ffmpeg.on('log', logHandler);
       try {
-        await ffmpeg.exec(['-i', inputPath, '-vframes', '1', '-f', 'null', '-']);
-      } catch (e) {}
+        // Only probe metadata (extremely fast, no decoding required)
+        await ffmpeg.exec(['-hide_banner', '-i', inputPath]);
+      } catch (e) {
+        // Error is expected because no output file was specified, 
+        // but logHandler will have already captured the stream info.
+        console.info('FFmpeg metadata probe (expected error):', e);
+      }
       ffmpeg.off('log', logHandler);
 
       let extractedTracks: SubtitleTrack[] = [];
