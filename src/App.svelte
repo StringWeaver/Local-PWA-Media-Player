@@ -544,34 +544,31 @@
 
   <mdui-layout-main class="layout-main" style="min-height: calc(100vh - 64px);">
       {#if view === 'home'}
-        <mdui-card variant="filled" class="upload-card">
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="upload-area" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
-            <CloudUpload class="upload-icon" />
-            <h2 class="upload-title">Select or drop video</h2>
-            <p class="upload-desc">
-              Supports MP4, WebM, and MKV files.
-              MKV files will be locally remuxed to MP4 right in your browser securely.
-            </p>
-            <input 
-              type="file" 
-              bind:this={fileInputRef} 
-              onchange={handleInputChange} 
-              accept="video/*,.mkv" 
-              class="hidden" 
-            />
-            <mdui-button class="btn-pill" style="--shape-corner: var(--mdui-shape-corner-full); padding-inline: 2rem;">Browse Files</mdui-button>
-          </div>
+        <mdui-card variant="filled" clickable class="upload-card"
+          ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
+          <CloudUpload class="upload-icon" />
+          <h2 class="upload-title">Select or drop video</h2>
+          <p class="upload-desc">
+            Supports MP4, WebM, and MKV files.
+            MKV files will be locally remuxed to MP4 right in your browser securely.
+          </p>
+          <input 
+            type="file" 
+            bind:this={fileInputRef} 
+            onchange={handleInputChange} 
+            accept="video/*,.mkv" 
+            class="hidden" 
+          />
+          <mdui-button variant="filled" style="border-radius: 9999px; padding-inline: 2rem;">Browse Files</mdui-button>
         </mdui-card>
 
         {#if storageUsed !== ''}
           <mdui-card variant="filled" class="storage-card">
-             <div class="storage-info">
-                 <span class="storage-label">Local Storage Used</span>
-                 <span class="storage-value">{storageUsed}</span>
+             <div style="display:flex;flex-direction:column">
+                 <span style="font-size:var(--mdui-typescale-body-medium-size);font-weight:var(--mdui-typescale-label-large-weight)">Local Storage Used</span>
+                 <span style="font-size:var(--mdui-typescale-body-small-size);color:var(--mdui-color-on-surface-variant)">{storageUsed}</span>
              </div>
-             <mdui-button variant="tonal" class="btn-clear" style="--shape-corner: var(--mdui-shape-corner-full);" onclick={promptClearCache}>Clear Cache</mdui-button>
+             <mdui-button variant="tonal" style="border-radius: 9999px;" onclick={promptClearCache}>Clear Cache</mdui-button>
           </mdui-card>
         {/if}
       {/if}
@@ -579,29 +576,17 @@
       {#if view === 'play'}
           <div class="play-container">
           {#if appState === 'CONVERTING'}
-              <mdui-card variant="filled" class="converting-card">
-                 <div class="progress-icon-wrap"><mdui-circular-progress class="icon-lg"></mdui-circular-progress></div>
-                 <h3 class="card-title">Processing Video</h3>
-                 <p class="card-desc">{statusMessage}</p>
-                 
-                 <div class="progress-section">
-                   <div class="progress-label-row">
-                     <span class="progress-badge">
-                       {progress}%
-                     </span>
-                   </div>
-                   <mdui-linear-progress value={progress / 100} max="1"></mdui-linear-progress>
-                 </div>
-              </mdui-card>
+              <mdui-dialog open headline="Processing Video" description={statusMessage} close-on-overlay-click>
+                <mdui-circular-progress slot="icon" style="width:4rem;height:4rem"></mdui-circular-progress>
+                <mdui-linear-progress value={progress / 100} max="1"></mdui-linear-progress>
+              </mdui-dialog>
             {/if}
 
             {#if appState === 'ERROR'}
-               <mdui-card variant="filled" class="error-card">
-                  <div class="error-icon-wrap"><AlertTriangle class="error-icon" /></div>
-                  <h3 class="error-title">Processing Failed</h3>
-                  <p class="error-desc">{errorMessage}</p>
-                  <mdui-button class="btn-pill" style="--shape-corner: var(--mdui-shape-corner-full); padding-inline: 2rem;" onclick={goBack}>Go Back</mdui-button>
-               </mdui-card>
+               <mdui-dialog open headline="Processing Failed" description={errorMessage} close-on-overlay-click>
+                <div slot="icon" style="color:var(--mdui-color-error)"><AlertTriangle style="width:4rem;height:4rem" /></div>
+                <mdui-button slot="action" variant="text" onclick={goBack}>Go Back</mdui-button>
+               </mdui-dialog>
             {/if}
 
             {#if appState === 'PLAYING'}
@@ -626,7 +611,7 @@
               </video>
               <div class="play-info">
                  <Info class="icon-xs" />
-                 <span>Playing locally directly from browser.</span>
+                 <span>Video file is handled locally by your browser.</span>
               </div>
             {/if}
           </div>
@@ -640,28 +625,14 @@
 </mdui-layout>
 
 <style>
-  /* Icon sizes */
-  :global(.icon-xs) {
-    width: 1rem;
-    height: 1rem;
-  }
-
-  :global(.icon-sm) {
-    width: 1.5rem;
-    height: 1.5rem;
-  }
-
-  :global(.icon-lg) {
-    width: 4rem;
-    height: 4rem;
-  }
+  /* Lucide icon sizes */
+  :global(.icon-xs) { width: 1rem; height: 1rem; }
+  :global(.icon-sm) { width: 1.5rem; height: 1.5rem; }
 
   /* Hidden file inputs */
-  .hidden {
-    display: none;
-  }
+  .hidden { display: none; }
 
-  /* Layout: mdui-layout-main 自带 flex:1 0 auto，只需加方向 */
+  /* Layout */
   :global(.layout-main) {
     display: flex;
     flex-direction: column;
@@ -675,14 +646,6 @@
     align-items: center;
     padding: 3rem 1rem;
     margin: 2rem 1rem 0;
-  }
-
-  .upload-area {
-    width: 100%;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
   }
 
   :global(.upload-icon) {
@@ -706,15 +669,6 @@
     font-size: var(--mdui-typescale-body-medium-size);
   }
 
-  /* Pill buttons — mdui-button 默认 shape-corner 已是 full，只调 padding */
-  :global(.btn-pill) {
-    width: auto;
-  }
-
-  :global(.btn-clear) {
-    width: auto;
-  }
-
   /* Storage card */
   :global(.storage-card) {
     display: flex;
@@ -722,21 +676,6 @@
     justify-content: space-between;
     padding: 1rem;
     margin: 1rem;
-  }
-
-  .storage-info {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .storage-label {
-    font-size: var(--mdui-typescale-body-medium-size);
-    font-weight: var(--mdui-typescale-label-large-weight);
-  }
-
-  .storage-value {
-    font-size: var(--mdui-typescale-body-small-size);
-    color: var(--mdui-color-on-surface-variant);
   }
 
   /* Play container */
@@ -747,80 +686,6 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-  }
-
-  /* Shared card layout (converting + error) */
-  :global(.converting-card),
-  :global(.error-card) {
-    width: 100%;
-    max-width: 28rem;
-    padding: 2rem;
-    margin: 1rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  :global(.error-icon) {
-    width: 4rem;
-    height: 4rem;
-    color: var(--mdui-color-error);
-  }
-
-  .progress-icon-wrap,
-  .error-icon-wrap {
-    margin-bottom: 1rem;
-  }
-
-  .progress-icon-wrap {
-    margin-bottom: 2rem;
-  }
-
-  /* Shared title style */
-  .card-title,
-  .error-title {
-    font-size: var(--mdui-typescale-title-large-size);
-    font-weight: var(--mdui-typescale-title-medium-weight);
-    margin-bottom: 0.5rem;
-  }
-
-  .error-title {
-    color: var(--mdui-color-error);
-  }
-
-  /* Shared description style */
-  .card-desc,
-  .error-desc {
-    color: var(--mdui-color-on-surface-variant);
-    margin-bottom: 1.5rem;
-  }
-
-  .card-desc {
-    min-height: 3rem;
-  }
-
-  /* Progress */
-  .progress-section {
-    width: 100%;
-  }
-
-  .progress-label-row {
-    display: flex;
-    margin-bottom: 0.5rem;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .progress-badge {
-    font-size: var(--mdui-typescale-label-small-size);
-    font-weight: var(--mdui-typescale-label-large-weight);
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    text-transform: uppercase;
-    border-radius: 9999px;
-    background: color-mix(in srgb, var(--mdui-color-primary) 10%, transparent);
-    color: var(--mdui-color-primary);
   }
 
   /* Video player */
