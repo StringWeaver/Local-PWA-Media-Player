@@ -514,7 +514,7 @@
   <mdui-top-app-bar>
     {#if view === 'play' && appState === 'PLAYING'}
       <mdui-button-icon onclick={goBack}>
-        <ArrowLeft class="w-6 h-6" />
+        <ArrowLeft class="icon-sm" />
       </mdui-button-icon>
     {/if}
 
@@ -523,9 +523,9 @@
     <div style="flex-grow: 1"></div>
 
     {#if view === 'play' && appState === 'PLAYING'}
-      <div class="flex items-center pr-2">
+      <div class="toolbar-actions">
         {#if isProcessingSubtitle}
-          <mdui-circular-progress class="w-6 h-6"></mdui-circular-progress>
+          <mdui-circular-progress class="icon-sm"></mdui-circular-progress>
         {:else}
           <input 
             type="file" 
@@ -535,23 +535,23 @@
             class="hidden" 
           />
           <mdui-button-icon onclick={() => subtitleInputRef?.click()}>
-            <MessageSquareText class="w-6 h-6" />
+            <MessageSquareText class="icon-sm" />
           </mdui-button-icon>
         {/if}
       </div>
     {/if}
   </mdui-top-app-bar>
 
-  <mdui-layout-main class="flex flex-col h-full" style="min-height: calc(100vh - 64px);">
-    <div class="flex flex-col flex-1 h-full">
+  <mdui-layout-main class="layout-main" style="min-height: calc(100vh - 64px);">
+    <div class="content-wrapper">
       {#if view === 'home'}
-        <mdui-card variant="filled" class="flex flex-col items-center py-12 px-4 mx-4 mt-8">
+        <mdui-card variant="filled" class="upload-card">
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="w-full cursor-pointer flex flex-col items-center" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
-            <CloudUpload class="w-16 h-16 text-primary" />
-            <h2 class="mt-4 mb-2 text-2xl font-semibold text-center">Select or drop video</h2>
-            <p class="text-center text-gray-500 mb-6 text-sm">
+          <div class="upload-area" ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
+            <CloudUpload class="upload-icon" />
+            <h2 class="upload-title">Select or drop video</h2>
+            <p class="upload-desc">
               Supports MP4, WebM, and MKV files.
               MKV files will be locally remuxed to MP4 right in your browser securely.
             </p>
@@ -562,32 +562,32 @@
               accept="video/*,.mkv" 
               class="hidden" 
             />
-            <mdui-button class="w-auto px-8" style="border-radius: 9999px;">Browse Files</mdui-button>
+            <mdui-button class="btn-pill">Browse Files</mdui-button>
           </div>
         </mdui-card>
 
         {#if storageUsed !== ''}
-          <mdui-card variant="filled" class="flex items-center justify-between p-4 mx-4 mt-4">
-             <div class="flex flex-col">
-                 <span class="text-sm font-medium">Local Storage Used</span>
-                 <span class="text-xs text-gray-500">{storageUsed}</span>
+          <mdui-card variant="filled" class="storage-card">
+             <div class="storage-info">
+                 <span class="storage-label">Local Storage Used</span>
+                 <span class="storage-value">{storageUsed}</span>
              </div>
-             <mdui-button variant="tonal" class="w-auto px-4" style="border-radius: 9999px;" onclick={promptClearCache}>Clear Cache</mdui-button>
+             <mdui-button variant="tonal" class="btn-clear" onclick={promptClearCache}>Clear Cache</mdui-button>
           </mdui-card>
         {/if}
       {/if}
 
       {#if view === 'play'}
-        <div class="w-full flex-1 flex flex-col items-center justify-center">
+          <div class="play-container">
           {#if appState === 'CONVERTING'}
-              <mdui-card variant="filled" class="w-full max-w-md p-8 m-4 flex flex-col items-center text-center">
-                 <div class="mb-8"><mdui-circular-progress class="w-16 h-16"></mdui-circular-progress></div>
-                 <h3 class="text-xl font-semibold mb-2">Processing Video</h3>
-                 <p class="text-gray-500 mb-6 min-h-[48px]">{statusMessage}</p>
+              <mdui-card variant="filled" class="converting-card">
+                 <div class="progress-icon-wrap"><mdui-circular-progress class="icon-lg"></mdui-circular-progress></div>
+                 <h3 class="card-title">Processing Video</h3>
+                 <p class="card-desc">{statusMessage}</p>
                  
-                 <div class="w-full">
-                   <div class="flex mb-2 items-center justify-between">
-                     <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full bg-primary/10 text-primary">
+                 <div class="progress-section">
+                   <div class="progress-label-row">
+                     <span class="progress-badge">
                        {progress}%
                      </span>
                    </div>
@@ -597,11 +597,11 @@
             {/if}
 
             {#if appState === 'ERROR'}
-               <mdui-card variant="filled" class="text-center p-8 m-4 flex flex-col items-center">
-                  <div class="mb-4"><AlertTriangle class="w-16 h-16 text-red-500" /></div>
-                  <h3 class="text-xl font-semibold mb-2 text-red-500">Processing Failed</h3>
-                  <p class="text-gray-500 mb-6 max-w-md">{errorMessage}</p>
-                  <mdui-button class="w-auto px-8" style="border-radius: 9999px;" onclick={goBack}>Go Back</mdui-button>
+               <mdui-card variant="filled" class="error-card">
+                  <div class="error-icon-wrap"><AlertTriangle class="error-icon" /></div>
+                  <h3 class="error-title">Processing Failed</h3>
+                  <p class="error-desc">{errorMessage}</p>
+                  <mdui-button class="btn-pill" onclick={goBack}>Go Back</mdui-button>
                </mdui-card>
             {/if}
 
@@ -612,7 +612,7 @@
                 src={videoUrl}
                 controls
                 playsinline
-                class="max-w-[90vw] max-h-[80vh] bg-black shadow-xl"
+                class="video-player"
                   style="width: fit-content; height: auto;"
               >
                  {#each subtitleTracks as track, idx}
@@ -625,8 +625,8 @@
                    />
                  {/each}
               </video>
-              <div class="mt-4 text-sm text-gray-500 flex items-center justify-center space-x-2">
-                 <Info class="w-4 h-4" />
+              <div class="play-info">
+                 <Info class="icon-xs" />
                  <span>Playing locally directly from browser.</span>
               </div>
             {/if}
@@ -637,10 +637,249 @@
 
   <mdui-dialog open={dialogOpened} onclosed={() => dialogOpened = false} close-on-overlay-click>
     <span slot="headline">{dialogTitle}</span>
-    <div class="text-sm text-gray-500">
+    <div class="dialog-message">
       {dialogMessage}
     </div>
     <mdui-button slot="action" variant="text" onclick={() => dialogOpened = false}>Cancel</mdui-button>
     <mdui-button slot="action" variant="text" onclick={confirmClearCache}>OK</mdui-button>
   </mdui-dialog>
 </mdui-layout>
+
+<style>
+  /* Icon sizes */
+  :global(.icon-xs) {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  :global(.icon-sm) {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  :global(.icon-lg) {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  /* Hidden file inputs */
+  .hidden {
+    display: none;
+  }
+
+  /* Toolbar */
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    padding-right: 0.5rem;
+  }
+
+  /* Layout */
+  :global(.layout-main) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .content-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+  }
+
+  /* Upload card */
+  :global(.upload-card) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 1rem;
+    margin: 2rem 1rem 0;
+  }
+
+  .upload-area {
+    width: 100%;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  :global(.upload-icon) {
+    width: 4rem;
+    height: 4rem;
+    color: var(--mdui-color-primary);
+  }
+
+  .upload-title {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .upload-desc {
+    text-align: center;
+    color: var(--mdui-color-on-surface-variant);
+    margin-bottom: 1.5rem;
+    font-size: 0.875rem;
+  }
+
+  /* Pill buttons */
+  :global(.btn-pill) {
+    width: auto;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    border-radius: 9999px;
+  }
+
+  :global(.btn-clear) {
+    width: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    border-radius: 9999px;
+  }
+
+  /* Storage card */
+  :global(.storage-card) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    margin: 1rem;
+  }
+
+  .storage-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .storage-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .storage-value {
+    font-size: 0.75rem;
+    color: var(--mdui-color-on-surface-variant);
+  }
+
+  /* Play container */
+  .play-container {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Converting card */
+  :global(.converting-card) {
+    width: 100%;
+    max-width: 28rem;
+    padding: 2rem;
+    margin: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .progress-icon-wrap {
+    margin-bottom: 2rem;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-desc {
+    color: var(--mdui-color-on-surface-variant);
+    margin-bottom: 1.5rem;
+    min-height: 3rem;
+  }
+
+  .progress-section {
+    width: 100%;
+  }
+
+  .progress-label-row {
+    display: flex;
+    margin-bottom: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .progress-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    text-transform: uppercase;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--mdui-color-primary) 10%, transparent);
+    color: var(--mdui-color-primary);
+  }
+
+  /* Error card */
+  :global(.error-card) {
+    text-align: center;
+    padding: 2rem;
+    margin: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .error-icon-wrap {
+    margin-bottom: 1rem;
+  }
+
+  :global(.error-icon) {
+    width: 4rem;
+    height: 4rem;
+    color: var(--mdui-color-error);
+  }
+
+  .error-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--mdui-color-error);
+  }
+
+  .error-desc {
+    color: var(--mdui-color-on-surface-variant);
+    margin-bottom: 1.5rem;
+    max-width: 28rem;
+  }
+
+  /* Video player */
+  .video-player {
+    max-width: 90vw;
+    max-height: 80vh;
+    background: black;
+    box-shadow: var(--mdui-elevation-level3);
+  }
+
+  /* Play info bar */
+  .play-info {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--mdui-color-on-surface-variant);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  /* Dialog */
+  .dialog-message {
+    font-size: 0.875rem;
+    color: var(--mdui-color-on-surface-variant);
+  }
+</style>
