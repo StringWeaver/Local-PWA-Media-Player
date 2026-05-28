@@ -544,33 +544,35 @@
 
   <mdui-layout-main class="layout-main" style="min-height: calc(100vh - 64px);">
       {#if view === 'home'}
-        <mdui-card variant="filled" clickable class="upload-card"
-          ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
-          <CloudUpload class="upload-icon" />
-          <h2 class="upload-title">Select or drop video</h2>
-          <p class="upload-desc">
-            Supports MP4, WebM, and MKV files.
-            MKV files will be locally remuxed to MP4 right in your browser securely.
-          </p>
-          <input 
-            type="file" 
-            bind:this={fileInputRef} 
-            onchange={handleInputChange} 
-            accept="video/*,.mkv" 
-            class="hidden" 
-          />
-          <mdui-button variant="filled" style="border-radius: 9999px; padding-inline: 2rem;">Browse Files</mdui-button>
-        </mdui-card>
-
-        {#if storageUsed !== ''}
-          <mdui-card variant="filled" class="storage-card">
-             <div style="display:flex;flex-direction:column">
-                 <span style="font-size:var(--mdui-typescale-body-medium-size);font-weight:var(--mdui-typescale-label-large-weight)">Local Storage Used</span>
-                 <span style="font-size:var(--mdui-typescale-body-small-size);color:var(--mdui-color-on-surface-variant)">{storageUsed}</span>
-             </div>
-             <mdui-button variant="tonal" style="border-radius: 9999px;" onclick={promptClearCache}>Clear Cache</mdui-button>
+        <div class="home-container">
+          <mdui-card variant="filled" clickable class="upload-card"
+            ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
+            <CloudUpload class="upload-icon" />
+            <h2 class="upload-title">Select or drop video</h2>
+            <p class="upload-desc">
+              Supports MP4, WebM, and MKV files.
+              MKV files will be locally remuxed to MP4 right in your browser securely.
+            </p>
+            <input 
+              type="file" 
+              bind:this={fileInputRef} 
+              onchange={handleInputChange} 
+              accept="video/*,.mkv" 
+              class="hidden" 
+            />
+            <mdui-button variant="filled" style="border-radius: 9999px; padding-inline: 2rem;">Browse Files</mdui-button>
           </mdui-card>
-        {/if}
+
+          {#if storageUsed !== ''}
+            <mdui-card variant="filled" class="storage-card">
+               <div style="display:flex;flex-direction:column">
+                   <span style="font-size:var(--mdui-typescale-body-medium-size);font-weight:var(--mdui-typescale-label-large-weight)">Local Storage Used</span>
+                   <span style="font-size:var(--mdui-typescale-body-small-size);color:var(--mdui-color-on-surface-variant)">{storageUsed}</span>
+               </div>
+               <mdui-button variant="tonal" style="border-radius: 9999px;" onclick={promptClearCache}>Clear Cache</mdui-button>
+            </mdui-card>
+          {/if}
+        </div>
       {/if}
 
       {#if view === 'play'}
@@ -640,12 +642,19 @@
   }
 
   /* Upload card */
+  .home-container {
+    max-width: 40rem;
+    margin: 2rem auto 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
   :global(.upload-card) {
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 3rem 1rem;
-    margin: 2rem 1rem 0;
   }
 
   :global(.upload-icon) {
@@ -675,7 +684,6 @@
     align-items: center;
     justify-content: space-between;
     padding: 1rem;
-    margin: 1rem;
   }
 
   /* Play container */
