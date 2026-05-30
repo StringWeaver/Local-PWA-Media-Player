@@ -551,7 +551,7 @@
 </script>
 
 <mdui-layout class="app-layout">
-  <mdui-top-app-bar scroll-behavior="elevate" scroll-target=".layout-main">
+  <mdui-top-app-bar scroll-behavior="elevate">
     {#if view === 'play' && appState === 'PLAYING'}
       <mdui-button-icon onclick={goBack}>
         <mdui-icon-arrow-back></mdui-icon-arrow-back>
@@ -675,14 +675,17 @@
   .hidden { display: none; }
 
   /* Layout */
-  :global(.app-layout) {
-    height: 100%;
-    overflow: hidden;
+  :global(.app-layout > mdui-top-app-bar) {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2000;
   }
   :global(.layout-main) {
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    padding-top: 64px;
   }
 
   /* Upload card */
@@ -733,7 +736,7 @@
   /* Play container */
   .play-container {
     width: 100%;
-    flex: 1 0 auto;
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
