@@ -1,7 +1,13 @@
 <script lang="ts">
   import { snackbar } from 'mdui/functions/snackbar.js';
-  import { ArrowLeft, MessageSquareText, CloudUpload, AlertTriangle, Info } from 'lucide-svelte';
+  import '@mdui/icons/arrow-back.js';
+  import '@mdui/icons/subtitles.js';
+  import '@mdui/icons/video-file--outlined.js';
+  import '@mdui/icons/warning.js';
+  import '@mdui/icons/info.js';
+  import '@mdui/icons/download.js';
   import { getFfmpeg } from './lib/ffmpeg';
+  import { patchAppleTkhd } from './lib/patch-mp4';
 
   type ViewState = 'home' | 'play';
   type AppState = 'IDLE' | 'CONVERTING' | 'PLAYING' | 'ERROR';
@@ -39,16 +45,23 @@
   });
 
   async function updateStorageEstimate() {
-    if (!navigator.storage || !navigator.storage.estimate) {
-      storageUsed = 'Unknown';
-      return;
-    }
-    
     try {
-      const estimate = await navigator.storage.estimate();
-      const totalBytes = estimate.usage || 0;
+      const opfsRoot = await navigator.storage.getDirectory();
+      let totalBytes = 0;
+      // @ts-ignore
+      for await (const name of opfsRoot.keys()) {
+        if (name.startsWith('cache_media_')) {
+          const dir = await opfsRoot.getDirectoryHandle(name);
+          // @ts-ignore
+          for await (const fileName of dir.keys()) {
+            const fileHandle = await dir.getFileHandle(fileName);
+            const file = await fileHandle.getFile();
+            totalBytes += file.size;
+          }
+        }
+      }
       if (totalBytes === 0) {
-        storageUsed = 'Unknown';
+        storageUsed = 'Empty';
         return;
       }
       const mb = totalBytes / 1024 / 1024;
@@ -356,6 +369,9 @@
         await conversion.execute();
         input.dispose();
 
+        // statusMessage = 'Patching MP4 container for Apple device compatibility...';
+        // await patchAppleTkhd(fileHandle);
+
         statusMessage = 'Finalizing OPFS file...';
         const finalFile = await fileHandle.getFile();
         finalVideoUrl = URL.createObjectURL(finalFile);
@@ -483,6 +499,17 @@
     }
   }
 
+  function downloadVideo() {
+    if (!videoUrl) return;
+    const a = document.createElement('a');
+    a.href = videoUrl;
+    const baseName = currentFileNameForProgress.replace(/\.[^/.]+$/, "");
+    a.download = baseName + ".mp4";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   function goBack() {
     if (playbackTimer) {
        clearInterval(playbackTimer);
@@ -523,22 +550,22 @@
   }
 </script>
 
-<mdui-layout>
-  <mdui-top-app-bar>
+<mdui-layout class="app-layout">
+  <mdui-top-app-bar scroll-behavior="elevate"> 
     {#if view === 'play' && appState === 'PLAYING'}
       <mdui-button-icon onclick={goBack}>
-        <ArrowLeft class="icon-sm" />
+        <mdui-icon-arrow-back></mdui-icon-arrow-back>
       </mdui-button-icon>
     {/if}
 
-    <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
+    <mdui-top-app-bar-title scroll-behavior="elevate">Local Player</mdui-top-app-bar-title>
 
-    <div style="flex-grow: 1"></div>
+    <div class="flex-spacer"></div>
 
     {#if view === 'play' && appState === 'PLAYING'}
-      <div style="display:flex;align-items:center;padding-right:0.5rem">
+      <div class="top-bar-actions">
         {#if isProcessingSubtitle}
-          <mdui-circular-progress class="icon-sm"></mdui-circular-progress>
+          <mdui-circular-progress class="subtitle-progress"></mdui-circular-progress>
         {:else}
           <input 
             type="file" 
@@ -548,19 +575,19 @@
             class="hidden" 
           />
           <mdui-button-icon onclick={() => subtitleInputRef?.click()}>
-            <MessageSquareText class="icon-sm" />
+            <mdui-icon-subtitles></mdui-icon-subtitles>
           </mdui-button-icon>
         {/if}
       </div>
     {/if}
   </mdui-top-app-bar>
 
-  <mdui-layout-main class="layout-main" style="min-height: calc(100vh - 64px);">
+  <mdui-layout-main class="layout-main">
       {#if view === 'home'}
         <div class="home-container">
           <mdui-card variant="filled" clickable class="upload-card"
             ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
-            <CloudUpload class="upload-icon" />
+            <mdui-icon-video-file--outlined class="upload-icon"></mdui-icon-video-file--outlined>
             <h2 class="upload-title">Select or drop video</h2>
             <p class="upload-desc">
               Supports MP4, WebM, and MKV files.
@@ -573,16 +600,16 @@
               accept="video/*,.mkv" 
               class="hidden" 
             />
-            <mdui-button variant="filled" style="border-radius: 9999px; padding-inline: 2rem;">Browse Files</mdui-button>
+            <mdui-button variant="filled" class="pill-button">Browse Files</mdui-button>
           </mdui-card>
 
           {#if storageUsed !== ''}
             <mdui-card variant="filled" class="storage-card">
-               <div style="display:flex;flex-direction:column">
-                   <span style="font-size:var(--mdui-typescale-body-medium-size);font-weight:var(--mdui-typescale-label-large-weight)">Local Storage Used</span>
-                   <span style="font-size:var(--mdui-typescale-body-small-size);color:var(--mdui-color-on-surface-variant)">{storageUsed}</span>
+               <div class="storage-info">
+                   <span class="storage-label">Local Storage Used</span>
+                   <span class="storage-value">{storageUsed}</span>
                </div>
-               <mdui-button variant="tonal" style="border-radius: 9999px;" onclick={promptClearCache}>Clear Cache</mdui-button>
+               <mdui-button variant="tonal" class="pill-button" onclick={promptClearCache}>Clear Cache</mdui-button>
             </mdui-card>
           {/if}
         </div>
@@ -592,14 +619,16 @@
           <div class="play-container">
           {#if appState === 'CONVERTING'}
               <mdui-dialog open headline="Processing Video" description={statusMessage} close-on-overlay-click>
-                <mdui-circular-progress slot="icon" style="width:4rem;height:4rem"></mdui-circular-progress>
+                <div class="dialog-progress-icon">
+                  <mdui-circular-progress></mdui-circular-progress>
+                </div>
                 <mdui-linear-progress value={progress / 100} max="1"></mdui-linear-progress>
               </mdui-dialog>
             {/if}
 
             {#if appState === 'ERROR'}
                <mdui-dialog open headline="Processing Failed" description={errorMessage} close-on-overlay-click>
-                <div slot="icon" style="color:var(--mdui-color-error)"><AlertTriangle style="width:4rem;height:4rem" /></div>
+                <mdui-icon-warning slot="icon" class="dialog-error-icon"></mdui-icon-warning>
                 <mdui-button slot="action" variant="text" onclick={goBack}>Go Back</mdui-button>
                </mdui-dialog>
             {/if}
@@ -612,7 +641,6 @@
                 controls
                 playsinline
                 class="video-player"
-                  style="width: fit-content; height: auto;"
               >
                  {#each subtitleTracks as track, idx}
                    <track
@@ -624,34 +652,36 @@
                    />
                  {/each}
               </video>
-              <div class="play-info">
-                 <Info class="icon-xs" />
-                 <span>Video file is handled locally by your browser.</span>
+              <div class="download-row">
+                 <mdui-button variant="tonal" onclick={downloadVideo}>
+                    <mdui-icon-download slot="icon"></mdui-icon-download>
+                    Export to MP4
+                 </mdui-button>
               </div>
             {/if}
           </div>
         {/if}
   </mdui-layout-main>
 
-  <mdui-dialog open={dialogOpened} headline={dialogTitle} description={dialogMessage} onclosed={() => dialogOpened = false} close-on-overlay-click>
-    <mdui-button slot="action" variant="text" onclick={() => dialogOpened = false}>Cancel</mdui-button>
-    <mdui-button slot="action" variant="text" onclick={confirmClearCache}>OK</mdui-button>
-  </mdui-dialog>
 </mdui-layout>
 
-<style>
-  /* Lucide icon sizes */
-  :global(.icon-xs) { width: 1rem; height: 1rem; }
-  :global(.icon-sm) { width: 1.5rem; height: 1.5rem; }
+<mdui-dialog open={dialogOpened} headline={dialogTitle} description={dialogMessage} onclosed={() => dialogOpened = false} close-on-overlay-click>
+  <mdui-button slot="action" variant="text" onclick={() => dialogOpened = false}>Cancel</mdui-button>
+  <mdui-button slot="action" variant="text" onclick={confirmClearCache}>OK</mdui-button>
+</mdui-dialog>
 
+<style>
   /* Hidden file inputs */
   .hidden { display: none; }
 
   /* Layout */
+  :global(.app-layout) {
+    height: 100vh;
+  }
   :global(.layout-main) {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    overflow-y: auto;
   }
 
   /* Upload card */
@@ -671,9 +701,8 @@
   }
 
   :global(.upload-icon) {
-    width: 4rem;
-    height: 4rem;
-    color: var(--mdui-color-primary);
+    font-size: 4rem;
+    color: rgb(var(--mdui-color-primary));
   }
 
   .upload-title {
@@ -686,7 +715,7 @@
 
   .upload-desc {
     text-align: center;
-    color: var(--mdui-color-on-surface-variant);
+    color: rgb(var(--mdui-color-on-surface-variant));
     margin-bottom: 1.5rem;
     font-size: var(--mdui-typescale-body-medium-size);
   }
@@ -702,29 +731,87 @@
   /* Play container */
   .play-container {
     width: 100%;
-    flex: 1;
+    flex: 1 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    padding: 1rem 0;
   }
 
   /* Video player */
   .video-player {
     max-width: 90vw;
-    max-height: 80vh;
     background: black;
     box-shadow: var(--mdui-elevation-level3);
+    width: fit-content;
+    height: auto;
   }
 
-  /* Play info bar */
-  .play-info {
-    margin-top: 1rem;
-    font-size: var(--mdui-typescale-body-medium-size);
-    color: var(--mdui-color-on-surface-variant);
+
+
+  :global(.info-icon) {
+    font-size: 1rem;
+    color: rgb(var(--mdui-color-on-surface-variant));
+  }
+
+  /* Flex spacer for top app bar */
+  .flex-spacer { flex-grow: 1; }
+
+  /* Top bar actions container */
+  .top-bar-actions {
     display: flex;
     align-items: center;
+    padding-right: 0.5rem;
+  }
+
+  /* Subtitle processing progress in top bar */
+  :global(.subtitle-progress) {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  /* Pill-shaped buttons */
+  :global(.pill-button) {
+    border-radius: 9999px;
+    padding-inline: 2rem;
+  }
+
+  /* Storage card internals */
+  .storage-info {
+    display: flex;
+    flex-direction: column;
+  }
+  .storage-label {
+    font-size: var(--mdui-typescale-body-medium-size);
+    font-weight: var(--mdui-typescale-label-large-weight);
+  }
+  .storage-value {
+    font-size: var(--mdui-typescale-body-small-size);
+    color: rgb(var(--mdui-color-on-surface-variant));
+  }
+
+  /* Download button row */
+  .download-row {
+    margin-top: 1rem;
+    display: flex;
     justify-content: center;
-    gap: 0.5rem;
+  }
+
+  /* Dialog progress icon */
+  :global(.dialog-progress-icon) {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+  :global(.dialog-progress-icon mdui-circular-progress) {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  /* Dialog error icon */
+  :global(.dialog-error-icon) {
+    font-size: 4rem;
+    color: rgb(var(--mdui-color-error));
   }
 </style>
