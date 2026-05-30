@@ -551,14 +551,14 @@
 </script>
 
 <mdui-layout class="app-layout">
-  <mdui-top-app-bar scroll-behavior="elevate"> 
+  <mdui-top-app-bar scroll-behavior="elevate" scroll-target=".layout-main">
     {#if view === 'play' && appState === 'PLAYING'}
       <mdui-button-icon onclick={goBack}>
         <mdui-icon-arrow-back></mdui-icon-arrow-back>
       </mdui-button-icon>
     {/if}
 
-    <mdui-top-app-bar-title scroll-behavior="elevate">Local Player</mdui-top-app-bar-title>
+    <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
 
     <div class="flex-spacer"></div>
 
@@ -609,7 +609,7 @@
                    <span class="storage-label">Local Storage Used</span>
                    <span class="storage-value">{storageUsed}</span>
                </div>
-               <mdui-button variant="tonal" class="pill-button" onclick={promptClearCache}>Clear Cache</mdui-button>
+               <mdui-button variant="filled" class="pill-button" onclick={promptClearCache}>Clear Cache</mdui-button>
             </mdui-card>
           {/if}
         </div>
@@ -676,7 +676,8 @@
 
   /* Layout */
   :global(.app-layout) {
-    height: 100vh;
+    height: 100%;
+    overflow: hidden;
   }
   :global(.layout-main) {
     display: flex;
@@ -687,6 +688,7 @@
   /* Upload card */
   .home-container {
     max-width: 40rem;
+    width: 90%;
     margin: 2rem auto 0;
     display: flex;
     flex-direction: column;
