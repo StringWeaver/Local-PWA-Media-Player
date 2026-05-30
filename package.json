@@ -16,7 +16,7 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@mdui/icons": "^1.0.3",
     "mdui": "^2.1.3",
-    "mediabunny": "file:../mediabunny",
+    "mediabunny": "latest",
     "svelte": "^5.20.0"
   },
   "devDependencies": {
