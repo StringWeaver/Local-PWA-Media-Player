@@ -7,8 +7,6 @@
   import '@mdui/icons/info.js';
   import '@mdui/icons/download.js';
   import { getFfmpeg } from './lib/ffmpeg';
-  import { patchAppleTkhd } from './lib/patch-mp4';
-
   type ViewState = 'home' | 'play';
   type AppState = 'IDLE' | 'CONVERTING' | 'PLAYING' | 'ERROR';
   type SubtitleTrack = { url: string; label: string; language: string };
@@ -368,9 +366,6 @@
 
         await conversion.execute();
         input.dispose();
-
-        // statusMessage = 'Patching MP4 container for Apple device compatibility...';
-        // await patchAppleTkhd(fileHandle);
 
         statusMessage = 'Finalizing OPFS file...';
         const finalFile = await fileHandle.getFile();
