@@ -26,9 +26,10 @@
   let fileInputRef: HTMLInputElement | undefined = $state();
   let subtitleInputRef: HTMLInputElement | undefined = $state();
   let videoRef: HTMLVideoElement | undefined = $state();
+  let videoCurrentTime: number = $state(0);
   
-  let playbackTimer: ReturnType<typeof setInterval> | undefined;
   let currentFileNameForProgress = '';
+  let lastSavedTime = 0;
 
   let dialogOpened = $state(false);
   let dialogTitle = $state('');
@@ -75,44 +76,25 @@
     }
   }
 
+  // Auto-save progress using Svelte's reactivity (throttled to 10s intervals)
   $effect(() => {
-    if (appState === 'PLAYING' && videoRef && currentFileNameForProgress) {
-      const savedProgress = localStorage.getItem(`progress_${currentFileNameForProgress}`);
-
-      let progressTimer: ReturnType<typeof setTimeout> | undefined;
-      const handleLoadedData = () => {
-        if (savedProgress && videoRef) {
-          progressTimer = setTimeout(() => {
-            if (videoRef) {
-              videoRef.currentTime = parseFloat(savedProgress);
-            }
-          }, 500);
-        }
-      };
-      
-      videoRef.addEventListener('loadeddata', handleLoadedData);
-
-      playbackTimer = setInterval(() => {
-         if (videoRef && !videoRef.paused) {
-             localStorage.setItem(`progress_${currentFileNameForProgress}`, videoRef.currentTime.toString());
-         }
-      }, 2000);
-      
-      return () => {
-        if (videoRef) {
-          videoRef.removeEventListener('loadeddata', handleLoadedData);
-        }
-        if (progressTimer) {
-          clearTimeout(progressTimer);
-          progressTimer = undefined;
-        }
-        if (playbackTimer) {
-          clearInterval(playbackTimer);
-          playbackTimer = undefined;
-        }
-      };
+    if (appState === 'PLAYING' && currentFileNameForProgress && videoCurrentTime > 0) {
+      if (Math.abs(videoCurrentTime - lastSavedTime) >= 10) {
+        localStorage.setItem(`progress_${currentFileNameForProgress}`, videoCurrentTime.toString());
+        lastSavedTime = videoCurrentTime;
+      }
     }
   });
+
+  // Restore saved progress when video loads
+  function onVideoLoadedMetadata() {
+    if (currentFileNameForProgress) {
+      const saved = localStorage.getItem(`progress_${currentFileNameForProgress}`);
+      if (saved && videoRef) {
+        videoRef.currentTime = parseFloat(saved);
+      }
+    }
+  }
 
   function promptClearCache() {
     dialogTitle = "Clear Local Cache?";
@@ -558,11 +540,9 @@
   }
 
   function goBack() {
-    if (playbackTimer) {
-       clearInterval(playbackTimer);
-       playbackTimer = undefined;
-    }
     currentFileNameForProgress = '';
+    videoCurrentTime = 0;
+    lastSavedTime = 0;
     
     // Safely detach the video element before revoking URLs
     if (videoRef) {
@@ -695,6 +675,8 @@
           <!-- svelte-ignore a11y_media_has_caption -->
           <video
             bind:this={videoRef}
+            bind:currentTime={videoCurrentTime}
+            onloadedmetadata={onVideoLoadedMetadata}
             src={videoUrl}
             controls
             playsinline
