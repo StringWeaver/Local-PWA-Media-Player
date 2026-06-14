@@ -676,7 +676,7 @@
       <mdui-layout-main>
         <div class="play-container">
         {#if appState === 'CONVERTING'}
-          <mdui-dialog open headline="Processing Video" description={statusMessage} close-on-overlay-click>
+          <mdui-dialog open headline="Processing Video" description={statusMessage} >
             <div class="dialog-progress-icon">
               <mdui-circular-progress></mdui-circular-progress>
             </div>
@@ -685,7 +685,7 @@
         {/if}
 
         {#if appState === 'ERROR'}
-           <mdui-dialog open headline="Processing Failed" description={errorMessage} close-on-overlay-click>
+           <mdui-dialog open headline="Processing Failed" description={errorMessage} >
             <mdui-icon-warning slot="icon" class="dialog-error-icon"></mdui-icon-warning>
              <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={goBack} onkeydown={(e) => e.key === 'Enter' && goBack()}>Go Back</mdui-button>
            </mdui-dialog>
@@ -723,7 +723,7 @@
   </div>
 {/if}
 
-<mdui-dialog open={dialogOpened} headline={dialogTitle} description={dialogMessage} onclosed={() => dialogOpened = false} close-on-overlay-click>
+<mdui-dialog open={dialogOpened} headline={dialogTitle} description={dialogMessage} onclosed={() => dialogOpened = false} >
   <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={() => dialogOpened = false} onkeydown={(e) => e.key === 'Enter' && (dialogOpened = false)}>Cancel</mdui-button>
   <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={() => { dialogConfirmAction?.(); }} onkeydown={(e) => e.key === 'Enter' && dialogConfirmAction?.()}>OK</mdui-button>
 </mdui-dialog>
@@ -732,9 +732,8 @@
   /* Hidden file inputs */
   .hidden { display: none; }
 
-  /* Layout main area: scrollable flex column */
+  /* Layout main area */
   :global(mdui-layout-main) {
-    display: flex;
     flex-direction: column;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -761,7 +760,7 @@
     inset: 0;
   }
 
-  /* Upload card */
+  /* Upload card container */
   .home-container {
     max-width: 40rem;
     width: 90%;
@@ -831,8 +830,6 @@
     width: fit-content;
   }
 
-
-
   /* Flex spacer for top app bar */
   .flex-spacer { flex-grow: 1; }
 
@@ -840,22 +837,9 @@
   .top-bar-actions {
     display: flex;
     align-items: center;
-    padding-right: 0.5rem;
   }
 
-  /* Subtitle processing progress in top bar */
-  :global(.subtitle-progress) {
-    width: 1.5rem;
-    height: 1.5rem;
-  }
-
-  /* Pill-shaped buttons */
-  :global(.pill-button) {
-    border-radius: 9999px;
-    padding-inline: 1rem;
-  }
-
-  /* Storage card internals */
+  /* Storage info */
   .storage-info {
     display: flex;
     flex-direction: column;
