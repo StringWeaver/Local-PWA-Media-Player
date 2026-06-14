@@ -6,7 +6,6 @@
   import '@mdui/icons/subtitles.js';
   import '@mdui/icons/video-file--outlined.js';
   import '@mdui/icons/warning.js';
-  import '@mdui/icons/info.js';
   import '@mdui/icons/download.js';
   import { getFfmpeg } from './lib/ffmpeg';
   type ViewState = 'home' | 'play';
@@ -203,19 +202,16 @@
   }
 
   async function handleFile(file: File) {
-    console.log('[handleFile] received:', file?.name);
     if (!file) {
       console.log('[handleFile] no file, returning');
       return;
     }
     const isMkv = file.name.toLowerCase().endsWith('.mkv');
-    console.log('[handleFile] setting view = play, isMkv:', isMkv);
     view = 'play';
     await processFile(file, isMkv);
   }
 
   async function processFile(file: File, isMkv: boolean) {
-    console.log('[processFile] starting:', file.name, 'isMkv:', isMkv);
     currentFileNameForProgress = file.name;
     appState = 'CONVERTING';
     progress = 0;
@@ -345,7 +341,7 @@
                   const sub = subtitleStreams[i];
                   const outName = outNames[i];
                   const subData = await ffmpeg.readFile(outName);
-                  const subBlob = new Blob([subData as Uint8Array], { type: 'text/vtt' });
+                  const subBlob = new Blob([subData as Uint8Array as BlobPart], { type: 'text/vtt' });
                   
                   // Save subtitle to OPFS cache
                   const subHandle = await cacheDir.getFileHandle(`sub_${i}.vtt`, { create: true });
@@ -463,7 +459,6 @@
 
   function handleInputChange(e: Event) {
     const target = e.target as HTMLInputElement;
-    console.log('[handleInputChange] files:', target.files?.length);
     if (target.files && target.files.length > 0) {
       handleFile(target.files[0]);
     } else {
@@ -505,7 +500,7 @@
        
        if (ret === 0) {
            const subData = await ffmpeg.readFile(outputName);
-           const subBlob = new Blob([subData as Uint8Array], { type: 'text/vtt' });
+           const subBlob = new Blob([subData as Uint8Array as BlobPart], { type: 'text/vtt' });
            subtitleTracks = [
                ...subtitleTracks,
                {
@@ -567,7 +562,7 @@
     }
     
     // Defer revoking to allow WebKit media engine to fully detach
-    const urlsToRevoke = [];
+    const urlsToRevoke: string[] = [];
     if (videoUrl) urlsToRevoke.push(videoUrl);
     subtitleTracks.forEach(t => urlsToRevoke.push(t.url));
     
@@ -600,8 +595,7 @@
   <mdui-layout-main>
     <div class="home-container">
     <mdui-card role="button" tabindex="0" variant="filled" clickable class="upload-card"
-      ondragover={handleDragOver} ondrop={handleDrop} onclick={() => { console.log('[upload-card] clicked'); fileInputRef?.click(); }}
-      onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>
+      ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}>
       <mdui-icon-video-file--outlined class="upload-icon"></mdui-icon-video-file--outlined>
       <h2 class="upload-title">Select or drop video</h2>
       <p class="upload-desc">
@@ -615,7 +609,7 @@
         accept="video/*,.mkv" 
         class="hidden" 
       />
-      <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={(e) => { e.stopPropagation(); fileInputRef?.click(); }} onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>Browse Files</mdui-button>
+      <mdui-button variant="filled" class="pill-button" onclick={(e: MouseEvent) => { e.stopPropagation(); fileInputRef?.click(); }}>Browse Files</mdui-button>
     </mdui-card>
 
     {#if storageUsed !== ''}
@@ -625,8 +619,8 @@
              <span class="storage-value">{storageUsed}</span>
          </div>
          <div class="storage-actions">
-           <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={promptClearCache} onkeydown={(e) => e.key === 'Enter' && promptClearCache()}>Clear Cache</mdui-button>
-           <mdui-button role="button" tabindex="0" variant="outlined" class="pill-button" onclick={promptClearAllData} onkeydown={(e) => e.key === 'Enter' && promptClearAllData()}>Clear All Data</mdui-button>
+           <mdui-button variant="filled" class="pill-button" onclick={promptClearCache}>Clear Cache</mdui-button>
+           <mdui-button variant="outlined" class="pill-button" onclick={promptClearAllData}>Clear All Data</mdui-button>
          </div>
       </mdui-card>
     {/if}
@@ -640,7 +634,7 @@
     <mdui-layout class="play-layout">
       <mdui-top-app-bar scroll-behavior="elevate" scroll-target=".play-layout mdui-layout-main">
       {#if appState === 'PLAYING'}
-        <mdui-button-icon role="button" tabindex="0" onclick={goBack} onkeydown={(e) => e.key === 'Enter' && goBack()}>
+        <mdui-button-icon onclick={goBack}>
           <mdui-icon-arrow-back></mdui-icon-arrow-back>
         </mdui-button-icon>
       {/if}
@@ -661,7 +655,7 @@
               onchange={handleSubtitleChange} 
               class="hidden" 
             />
-          <mdui-button-icon role="button" tabindex="0" onclick={() => subtitleInputRef?.click()} onkeydown={(e) => e.key === 'Enter' && subtitleInputRef?.click()}>
+          <mdui-button-icon onclick={() => subtitleInputRef?.click()}>
             <mdui-icon-subtitles></mdui-icon-subtitles>
           </mdui-button-icon>
           {/if}
@@ -682,7 +676,7 @@
         {#if appState === 'ERROR'}
            <mdui-dialog open headline="Processing Failed" description={errorMessage} >
             <mdui-icon-warning slot="icon" class="dialog-error-icon"></mdui-icon-warning>
-             <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={goBack} onkeydown={(e) => e.key === 'Enter' && goBack()}>Go Back</mdui-button>
+             <mdui-button slot="action" variant="text" onclick={goBack}>Go Back</mdui-button>
            </mdui-dialog>
         {/if}
 
@@ -708,7 +702,7 @@
              {/each}
           </video>
           <div class="download-row">
-             <mdui-button role="button" tabindex="0" variant="tonal" onclick={downloadVideo} onkeydown={(e) => e.key === 'Enter' && downloadVideo()}>
+             <mdui-button variant="tonal" onclick={downloadVideo}>
                 <mdui-icon-download slot="icon"></mdui-icon-download>
                 Export to MP4
              </mdui-button>
@@ -721,8 +715,8 @@
 {/if}
 
 <mdui-dialog open={dialogOpened} headline={dialogTitle} description={dialogMessage} onclosed={() => dialogOpened = false} >
-  <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={() => dialogOpened = false} onkeydown={(e) => e.key === 'Enter' && (dialogOpened = false)}>Cancel</mdui-button>
-  <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={() => { dialogConfirmAction?.(); }} onkeydown={(e) => e.key === 'Enter' && dialogConfirmAction?.()}>OK</mdui-button>
+  <mdui-button slot="action" variant="text" onclick={() => dialogOpened = false}>Cancel</mdui-button>
+  <mdui-button slot="action" variant="text" onclick={() => { dialogConfirmAction?.(); }}>OK</mdui-button>
 </mdui-dialog>
 
 <style>
