@@ -221,13 +221,19 @@
   }
 
   async function handleFile(file: File) {
-    if (!file) return;
+    console.log('[handleFile] received:', file?.name);
+    if (!file) {
+      console.log('[handleFile] no file, returning');
+      return;
+    }
     const isMkv = file.name.toLowerCase().endsWith('.mkv');
+    console.log('[handleFile] setting view = play, isMkv:', isMkv);
     view = 'play';
     await processFile(file, isMkv);
   }
 
   async function processFile(file: File, isMkv: boolean) {
+    console.log('[processFile] starting:', file.name, 'isMkv:', isMkv);
     currentFileNameForProgress = file.name;
     appState = 'CONVERTING';
     progress = 0;
@@ -460,9 +466,13 @@
 
   function handleInputChange(e: Event) {
     const target = e.target as HTMLInputElement;
+    console.log('[handleInputChange] files:', target.files?.length);
     if (target.files && target.files.length > 0) {
       handleFile(target.files[0]);
+    } else {
+      console.log('[handleInputChange] no file selected');
     }
+    target.value = ''; // Reset so same file can be selected again
   }
 
   async function loadExternalSubtitle(file: File) {
@@ -595,7 +605,7 @@
   <mdui-layout-main>
     <div class="home-container">
     <mdui-card role="button" tabindex="0" variant="filled" clickable class="upload-card"
-      ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}
+      ondragover={handleDragOver} ondrop={handleDrop} onclick={() => { console.log('[upload-card] clicked'); fileInputRef?.click(); }}
       onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>
       <mdui-icon-video-file--outlined class="upload-icon"></mdui-icon-video-file--outlined>
       <h2 class="upload-title">Select or drop video</h2>
@@ -610,7 +620,7 @@
         accept="video/*,.mkv" 
         class="hidden" 
       />
-      <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={() => fileInputRef?.click()} onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>Browse Files</mdui-button>
+      <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={(e) => { e.stopPropagation(); fileInputRef?.click(); }} onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>Browse Files</mdui-button>
     </mdui-card>
 
     {#if storageUsed !== ''}
@@ -631,7 +641,7 @@
 
 <!-- Play view: slides in from right, overlays on top of home -->
 {#if view === 'play'}
-  <div class="play-view-overlay" transition:fly={{ x: '100%', duration: 350, easing: cubicOut }}>
+  <div class="play-view-overlay" transition:fly={{ x: '100%', opacity: 1, duration: 350, easing: cubicOut }}>
     <mdui-layout class="play-layout">
       <mdui-top-app-bar scroll-behavior="elevate" scroll-target=".play-layout mdui-layout-main">
       {#if appState === 'PLAYING'}
@@ -741,6 +751,7 @@
     position: fixed;
     inset: 0;
     z-index: 10000;
+    background: rgb(var(--mdui-color-surface));
     box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
   }
 
@@ -799,7 +810,7 @@
   .storage-actions {
     display: flex;
     gap: 0.5rem;
-    flex-shrink: 0;
+    flex-shrink: 1;
   }
 
   /* Play container */
@@ -841,7 +852,7 @@
   /* Pill-shaped buttons */
   :global(.pill-button) {
     border-radius: 9999px;
-    padding-inline: 2rem;
+    padding-inline: 1rem;
   }
 
   /* Storage card internals */
