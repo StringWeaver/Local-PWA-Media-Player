@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { cubicOut } from 'svelte/easing';
+  import { fly } from 'svelte/transition';
   import { snackbar } from 'mdui/functions/snackbar.js';
   import '@mdui/icons/arrow-back.js';
   import '@mdui/icons/subtitles.js';
@@ -543,121 +545,123 @@
   }
 </script>
 
-{#if view === 'home'}
-  <mdui-top-app-bar scroll-behavior="elevate">
-    <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
-  </mdui-top-app-bar>
-  <main class="main-content">
-    <div class="home-container">
-      <mdui-card role="button" tabindex="0" variant="filled" clickable class="upload-card"
-        ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}
-        onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>
-        <mdui-icon-video-file--outlined class="upload-icon"></mdui-icon-video-file--outlined>
-        <h2 class="upload-title">Select or drop video</h2>
-        <p class="upload-desc">
-          Supports MP4, WebM, and MKV files.
-          MKV files will be locally remuxed to MP4 right in your browser securely.
-        </p>
-        <input 
-          type="file" 
-          bind:this={fileInputRef} 
-          onchange={handleInputChange} 
-          accept="video/*,.mkv" 
-          class="hidden" 
-        />
-        <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={() => fileInputRef?.click()} onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>Browse Files</mdui-button>
+<!-- Home view: always rendered as base layer -->
+<mdui-top-app-bar scroll-behavior="elevate">
+  <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
+</mdui-top-app-bar>
+<main class="main-content">
+  <div class="home-container">
+    <mdui-card role="button" tabindex="0" variant="filled" clickable class="upload-card"
+      ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}
+      onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>
+      <mdui-icon-video-file--outlined class="upload-icon"></mdui-icon-video-file--outlined>
+      <h2 class="upload-title">Select or drop video</h2>
+      <p class="upload-desc">
+        Supports MP4, WebM, and MKV files.
+        MKV files will be locally remuxed to MP4 right in your browser securely.
+      </p>
+      <input 
+        type="file" 
+        bind:this={fileInputRef} 
+        onchange={handleInputChange} 
+        accept="video/*,.mkv" 
+        class="hidden" 
+      />
+      <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={() => fileInputRef?.click()} onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>Browse Files</mdui-button>
+    </mdui-card>
+
+    {#if storageUsed !== ''}
+      <mdui-card variant="filled" class="storage-card">
+         <div class="storage-info">
+             <span class="storage-label">Local Storage Used</span>
+             <span class="storage-value">{storageUsed}</span>
+         </div>
+         <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={promptClearCache} onkeydown={(e) => e.key === 'Enter' && promptClearCache()}>Clear Cache</mdui-button>
       </mdui-card>
+    {/if}
+  </div>
+</main>
 
-      {#if storageUsed !== ''}
-        <mdui-card variant="filled" class="storage-card">
-           <div class="storage-info">
-               <span class="storage-label">Local Storage Used</span>
-               <span class="storage-value">{storageUsed}</span>
-           </div>
-           <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={promptClearCache} onkeydown={(e) => e.key === 'Enter' && promptClearCache()}>Clear Cache</mdui-button>
-        </mdui-card>
-      {/if}
-    </div>
-  </main>
-{/if}
-
+<!-- Play view: slides in from right, overlays on top of home -->
 {#if view === 'play'}
-  <mdui-top-app-bar scroll-behavior="elevate">
-    {#if appState === 'PLAYING'}
-      <mdui-button-icon role="button" tabindex="0" onclick={goBack} onkeydown={(e) => e.key === 'Enter' && goBack()}>
-        <mdui-icon-arrow-back></mdui-icon-arrow-back>
-      </mdui-button-icon>
-    {/if}
-
-    <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
-
-    <div class="flex-spacer"></div>
-
-    {#if appState === 'PLAYING'}
-      <div class="top-bar-actions">
-        {#if isProcessingSubtitle}
-          <mdui-circular-progress class="subtitle-progress"></mdui-circular-progress>
-        {:else}
-          <input 
-            type="file" 
-            accept=".srt,.ass" 
-            bind:this={subtitleInputRef} 
-            onchange={handleSubtitleChange} 
-            class="hidden" 
-          />
-        <mdui-button-icon role="button" tabindex="0" onclick={() => subtitleInputRef?.click()} onkeydown={(e) => e.key === 'Enter' && subtitleInputRef?.click()}>
-          <mdui-icon-subtitles></mdui-icon-subtitles>
+  <div class="play-view-overlay" transition:fly={{ x: '100%', duration: 350, easing: cubicOut }}>
+    <mdui-top-app-bar scroll-behavior="elevate">
+      {#if appState === 'PLAYING'}
+        <mdui-button-icon role="button" tabindex="0" onclick={goBack} onkeydown={(e) => e.key === 'Enter' && goBack()}>
+          <mdui-icon-arrow-back></mdui-icon-arrow-back>
         </mdui-button-icon>
-        {/if}
-      </div>
-    {/if}
-  </mdui-top-app-bar>
-  <main class="main-content">
-    <div class="play-container">
-      {#if appState === 'CONVERTING'}
-        <mdui-dialog open headline="Processing Video" description={statusMessage} close-on-overlay-click>
-          <div class="dialog-progress-icon">
-            <mdui-circular-progress></mdui-circular-progress>
-          </div>
-          <mdui-linear-progress value={progress / 100} max="1"></mdui-linear-progress>
-        </mdui-dialog>
       {/if}
 
-      {#if appState === 'ERROR'}
-         <mdui-dialog open headline="Processing Failed" description={errorMessage} close-on-overlay-click>
-          <mdui-icon-warning slot="icon" class="dialog-error-icon"></mdui-icon-warning>
-           <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={goBack} onkeydown={(e) => e.key === 'Enter' && goBack()}>Go Back</mdui-button>
-         </mdui-dialog>
-      {/if}
+      <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
+
+      <div class="flex-spacer"></div>
 
       {#if appState === 'PLAYING'}
-        <!-- svelte-ignore a11y_media_has_caption -->
-        <video
-          bind:this={videoRef}
-          src={videoUrl}
-          controls
-          playsinline
-          class="video-player"
-        >
-           {#each subtitleTracks as track, idx}
-             <track
-               kind="subtitles"
-               src={track.url}
-               srcLang={track.language}
-               label={track.label}
-               default={idx === 0}
-             />
-           {/each}
-        </video>
-        <div class="download-row">
-           <mdui-button role="button" tabindex="0" variant="tonal" onclick={downloadVideo} onkeydown={(e) => e.key === 'Enter' && downloadVideo()}>
-              <mdui-icon-download slot="icon"></mdui-icon-download>
-              Export to MP4
-           </mdui-button>
+        <div class="top-bar-actions">
+          {#if isProcessingSubtitle}
+            <mdui-circular-progress class="subtitle-progress"></mdui-circular-progress>
+          {:else}
+            <input 
+              type="file" 
+              accept=".srt,.ass" 
+              bind:this={subtitleInputRef} 
+              onchange={handleSubtitleChange} 
+              class="hidden" 
+            />
+          <mdui-button-icon role="button" tabindex="0" onclick={() => subtitleInputRef?.click()} onkeydown={(e) => e.key === 'Enter' && subtitleInputRef?.click()}>
+            <mdui-icon-subtitles></mdui-icon-subtitles>
+          </mdui-button-icon>
+          {/if}
         </div>
       {/if}
-    </div>
-  </main>
+    </mdui-top-app-bar>
+    <main class="play-main">
+      <div class="play-container">
+        {#if appState === 'CONVERTING'}
+          <mdui-dialog open headline="Processing Video" description={statusMessage} close-on-overlay-click>
+            <div class="dialog-progress-icon">
+              <mdui-circular-progress></mdui-circular-progress>
+            </div>
+            <mdui-linear-progress value={progress / 100} max="1"></mdui-linear-progress>
+          </mdui-dialog>
+        {/if}
+
+        {#if appState === 'ERROR'}
+           <mdui-dialog open headline="Processing Failed" description={errorMessage} close-on-overlay-click>
+            <mdui-icon-warning slot="icon" class="dialog-error-icon"></mdui-icon-warning>
+             <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={goBack} onkeydown={(e) => e.key === 'Enter' && goBack()}>Go Back</mdui-button>
+           </mdui-dialog>
+        {/if}
+
+        {#if appState === 'PLAYING'}
+          <!-- svelte-ignore a11y_media_has_caption -->
+          <video
+            bind:this={videoRef}
+            src={videoUrl}
+            controls
+            playsinline
+            class="video-player"
+          >
+             {#each subtitleTracks as track, idx}
+               <track
+                 kind="subtitles"
+                 src={track.url}
+                 srcLang={track.language}
+                 label={track.label}
+                 default={idx === 0}
+               />
+             {/each}
+          </video>
+          <div class="download-row">
+             <mdui-button role="button" tabindex="0" variant="tonal" onclick={downloadVideo} onkeydown={(e) => e.key === 'Enter' && downloadVideo()}>
+                <mdui-icon-download slot="icon"></mdui-icon-download>
+                Export to MP4
+             </mdui-button>
+          </div>
+        {/if}
+      </div>
+    </main>
+  </div>
 {/if}
 
 <mdui-dialog open={dialogOpened} headline={dialogTitle} description={dialogMessage} onclosed={() => dialogOpened = false} close-on-overlay-click>
@@ -669,9 +673,34 @@
   /* Hidden file inputs */
   .hidden { display: none; }
 
-  /* Main content area */
+  /* Main content area (home view) */
   .main-content {
     min-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Play view overlay - slides in from right */
+  .play-view-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    background: rgb(var(--mdui-color-surface-container));
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure play view's app bar has correct z-index within overlay */
+  .play-view-overlay :global(mdui-top-app-bar) {
+    --z-index: 0;
+  }
+
+  /* Play main content area */
+  .play-main {
+    flex: 1;
     display: flex;
     flex-direction: column;
   }
