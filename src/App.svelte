@@ -220,6 +220,21 @@
     appState = 'CONVERTING';
     progress = 0;
     
+    const opfsAvailable = !!navigator.storage?.getDirectory;
+    
+    // Fallback: play directly without caching when OPFS is unavailable (non-HTTPS)
+    if (!opfsAvailable && !isMkv) {
+      videoUrl = URL.createObjectURL(file);
+      appState = 'PLAYING';
+      return;
+    }
+    
+    if (!opfsAvailable && isMkv) {
+      appState = 'ERROR';
+      errorMessage = 'MKV conversion requires HTTPS or localhost for OPFS support. Please access this app via HTTPS.';
+      return;
+    }
+    
     let mounted = false;
     const mountDir = `/mnt_${Date.now()}`;
 
