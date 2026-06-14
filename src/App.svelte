@@ -33,6 +33,7 @@
   let dialogOpened = $state(false);
   let dialogTitle = $state('');
   let dialogMessage = $state('');
+  let dialogConfirmAction: (() => void) | null = $state(null);
 
   function showAlert(msg: string) {
     snackbar({ message: msg, placement: 'bottom' });
@@ -116,6 +117,7 @@
   function promptClearCache() {
     dialogTitle = "Clear Local Cache?";
     dialogMessage = `This will delete all saved processed videos and free up ${storageUsed}. You will need to process them again next time.`;
+    dialogConfirmAction = confirmClearCache;
     dialogOpened = true;
   }
 
@@ -138,6 +140,46 @@
       showAlert("Cache cleared successfully!");
     } catch(e) {
       showAlert("Failed to clear cache.");
+    }
+  }
+
+  function promptClearAllData() {
+    dialogTitle = "Clear All Data?";
+    dialogMessage = "This will delete ALL local data including cached videos, playback progress, and settings. The page will reload. This cannot be undone.";
+    dialogOpened = true;
+    // Override the confirm handler for this prompt
+    dialogConfirmAction = confirmClearAllData;
+  }
+
+  async function confirmClearAllData() {
+    dialogOpened = false;
+    try {
+      // Clear OPFS
+      const opfsRoot = await navigator.storage.getDirectory();
+      // @ts-ignore
+      for await (const name of opfsRoot.keys()) {
+        try { await opfsRoot.removeEntry(name, { recursive: true }); } catch(e) {}
+      }
+      // Clear localStorage
+      localStorage.clear();
+      // Clear Cache Storage
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+      // Clear IndexedDB
+      const dbs = await indexedDB.databases();
+      await Promise.all(dbs.map(db => {
+        return new Promise<void>((resolve) => {
+          const req = indexedDB.deleteDatabase(db.name!);
+          req.onsuccess = () => resolve();
+          req.onerror = () => resolve();
+        });
+      }));
+      // Reload page
+      window.location.reload();
+    } catch(e) {
+      showAlert("Failed to clear all data.");
     }
   }
 
@@ -546,11 +588,12 @@
 </script>
 
 <!-- Home view: always rendered as base layer -->
-<mdui-top-app-bar scroll-behavior="elevate">
-  <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
-</mdui-top-app-bar>
-<main class="main-content">
-  <div class="home-container">
+<mdui-layout class="home-layout">
+  <mdui-top-app-bar scroll-behavior="elevate" scroll-target=".home-layout mdui-layout-main">
+    <mdui-top-app-bar-title>Local Player</mdui-top-app-bar-title>
+  </mdui-top-app-bar>
+  <mdui-layout-main>
+    <div class="home-container">
     <mdui-card role="button" tabindex="0" variant="filled" clickable class="upload-card"
       ondragover={handleDragOver} ondrop={handleDrop} onclick={() => fileInputRef?.click()}
       onkeydown={(e) => e.key === 'Enter' && fileInputRef?.click()}>
@@ -576,16 +619,21 @@
              <span class="storage-label">Local Storage Used</span>
              <span class="storage-value">{storageUsed}</span>
          </div>
-         <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={promptClearCache} onkeydown={(e) => e.key === 'Enter' && promptClearCache()}>Clear Cache</mdui-button>
+         <div class="storage-actions">
+           <mdui-button role="button" tabindex="0" variant="filled" class="pill-button" onclick={promptClearCache} onkeydown={(e) => e.key === 'Enter' && promptClearCache()}>Clear Cache</mdui-button>
+           <mdui-button role="button" tabindex="0" variant="outlined" class="pill-button" onclick={promptClearAllData} onkeydown={(e) => e.key === 'Enter' && promptClearAllData()}>Clear All Data</mdui-button>
+         </div>
       </mdui-card>
     {/if}
   </div>
-</main>
+  </mdui-layout-main>
+</mdui-layout>
 
 <!-- Play view: slides in from right, overlays on top of home -->
 {#if view === 'play'}
   <div class="play-view-overlay" transition:fly={{ x: '100%', duration: 350, easing: cubicOut }}>
-    <mdui-top-app-bar scroll-behavior="elevate">
+    <mdui-layout class="play-layout">
+      <mdui-top-app-bar scroll-behavior="elevate" scroll-target=".play-layout mdui-layout-main">
       {#if appState === 'PLAYING'}
         <mdui-button-icon role="button" tabindex="0" onclick={goBack} onkeydown={(e) => e.key === 'Enter' && goBack()}>
           <mdui-icon-arrow-back></mdui-icon-arrow-back>
@@ -615,8 +663,8 @@
         </div>
       {/if}
     </mdui-top-app-bar>
-    <main class="play-main">
-      <div class="play-container">
+      <mdui-layout-main>
+        <div class="play-container">
         {#if appState === 'CONVERTING'}
           <mdui-dialog open headline="Processing Video" description={statusMessage} close-on-overlay-click>
             <div class="dialog-progress-icon">
@@ -660,49 +708,46 @@
           </div>
         {/if}
       </div>
-    </main>
+      </mdui-layout-main>
+    </mdui-layout>
   </div>
 {/if}
 
 <mdui-dialog open={dialogOpened} headline={dialogTitle} description={dialogMessage} onclosed={() => dialogOpened = false} close-on-overlay-click>
   <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={() => dialogOpened = false} onkeydown={(e) => e.key === 'Enter' && (dialogOpened = false)}>Cancel</mdui-button>
-  <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={confirmClearCache} onkeydown={(e) => e.key === 'Enter' && confirmClearCache()}>OK</mdui-button>
+  <mdui-button role="button" tabindex="0" slot="action" variant="text" onclick={() => { dialogConfirmAction?.(); }} onkeydown={(e) => e.key === 'Enter' && dialogConfirmAction?.()}>OK</mdui-button>
 </mdui-dialog>
 
 <style>
   /* Hidden file inputs */
   .hidden { display: none; }
 
-  /* Main content area (home view) */
-  .main-content {
-    min-height: calc(100vh - 64px);
+  /* Layout main area: scrollable flex column */
+  :global(mdui-layout-main) {
     display: flex;
     flex-direction: column;
-  }
-
-  /* Play view overlay - slides in from right */
-  .play-view-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 10000;
-    display: flex;
-    flex-direction: column;
-    background: rgb(var(--mdui-color-surface-container));
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Ensure play view's app bar has correct z-index within overlay */
-  .play-view-overlay :global(mdui-top-app-bar) {
-    --z-index: 0;
+  /* Home layout: fills viewport */
+  :global(.home-layout) {
+    position: fixed;
+    inset: 0;
   }
 
-  /* Play main content area */
-  .play-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+  /* Play view overlay: z-index layer */
+  .play-view-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Play layout: fills overlay */
+  :global(.play-layout) {
+    position: absolute;
+    inset: 0;
   }
 
   /* Upload card */
@@ -748,6 +793,13 @@
     align-items: center;
     justify-content: space-between;
     padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  .storage-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
   }
 
   /* Play container */
