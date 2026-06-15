@@ -29,6 +29,7 @@
   
   let currentFileNameForProgress = '';
   let lastSavedTime = 0;
+  let progressRestored = false;
 
   let dialogOpened = $state(false);
   let dialogTitle = $state('');
@@ -87,14 +88,14 @@
 
   // Restore saved progress when video is ready to play (one-time listener)
   function onVideoCanPlay() {
+    if (progressRestored) return;
+    progressRestored = true;
     if (videoRef && currentFileNameForProgress) {
       const saved = localStorage.getItem(`progress_${currentFileNameForProgress}`);
       if (saved) {
         videoRef.currentTime = parseFloat(saved);
       }
     }
-    // Remove listener after first trigger to avoid re-seeking on subsequent canplay events
-    videoRef?.removeEventListener('canplay', onVideoCanPlay);
   }
 
   function promptClearCache() {
@@ -555,6 +556,7 @@
     currentFileNameForProgress = '';
     videoCurrentTime = 0;
     lastSavedTime = 0;
+    progressRestored = false;
     
     // Safely detach the video element before revoking URLs
     if (videoRef) {
