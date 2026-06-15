@@ -85,14 +85,16 @@
     }
   });
 
-  // Restore saved progress when video loads
-  function onVideoLoadedMetadata() {
-    if (currentFileNameForProgress) {
+  // Restore saved progress when video is ready to play (one-time listener)
+  function onVideoCanPlay() {
+    if (videoRef && currentFileNameForProgress) {
       const saved = localStorage.getItem(`progress_${currentFileNameForProgress}`);
-      if (saved && videoRef) {
+      if (saved) {
         videoRef.currentTime = parseFloat(saved);
       }
     }
+    // Remove listener after first trigger to avoid re-seeking on subsequent canplay events
+    videoRef?.removeEventListener('canplay', onVideoCanPlay);
   }
 
   function promptClearCache() {
@@ -685,7 +687,7 @@
           <video
             bind:this={videoRef}
             bind:currentTime={videoCurrentTime}
-            onloadedmetadata={onVideoLoadedMetadata}
+            oncanplay={onVideoCanPlay}
             src={videoUrl}
             controls
             playsinline
